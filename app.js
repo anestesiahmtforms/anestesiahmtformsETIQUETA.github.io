@@ -1,5 +1,6 @@
 const CONFIG = {
   storageKey: "etiqueta-hmt-ia-v1",
+  googleClientId: "908976987584-o59p0obmvq013lg3t9726itf06e15v2c.apps.googleusercontent.com",
   guideWidthRatio: 0.94,
   guideAspectRatio: 3.35,
   defaultScriptUrl: "https://script.google.com/macros/s/AKfycbzTb2EQ8iM-oB5KnxI26uBvG_ddjDLCD7G0YBov9mgLe7apX89vBECecaUnOHyRTwED/exec",
@@ -25,6 +26,8 @@ const state = {
   monthlyRows: [],
   observationRows: [],
   selectedObservationRow: null,
+  auth: null,
+  authenticated: false,
 };
 
 const cameraEl = document.querySelector("#camera");
@@ -33,6 +36,9 @@ const previewEl = document.querySelector("#preview");
 const cameraStatusEl = document.querySelector("#camera-status");
 const processingStatusEl = document.querySelector("#processing-status");
 const sheetStatusEl = document.querySelector("#sheet-status");
+const authGateEl = document.querySelector("#auth-gate");
+const authMessageEl = document.querySelector("#auth-message");
+const authUserEl = document.querySelector("#auth-user");
 const scriptUrlEl = document.querySelector("#script-url");
 const formEl = document.querySelector("#label-form");
 const summaryDateEl = document.querySelector("#summary-date");
@@ -109,11 +115,204 @@ async function bootstrap() {
   setupPlantonistasPicker();
   syncPlantonistasRequirement();
   renderSheetStatus();
+  const authorized = await authenticateUser();
+  if (!authorized) {
+    registerServiceWorker();
+    return;
+  }
   await loadMetadata();
   await loadSummary({ silent: true });
   await loadMonthlySummary({ silent: true });
   await loadObservationRecords({ silent: true });
   registerServiceWorker();
+}
+
+async function authenticateUser() {
+  showAuthGate("Verificando sua conta Google cadastrada...");
+  renderAuthStatus();
+
+  if (!CONFIG.googleClientId) {
+    showAuthGate("Você precisa estar logado em sua conta Google Cadastrada para entrar");
+    return false;
+  }
+
+  try {
+    await waitForGoogleIdentity();
+    const credential = await requestGoogleCredential();
+    const authResult = await validateGoogleCredential(credential);
+
+    state.auth = {
+      token: credential,
+      email: String(authResult.email || "").toLowerCase(),
+      name: authResult.name || "",
+      expiresAt: getJwtExpirationMs(credential),
+    };
+    state.authenticated = true;
+    hideAuthGate();
+    renderAuthStatus();
+    return true;
+  } catch (error) {
+    console.warn("Falha na autenticacao Google:", error);
+    state.auth = null;
+    state.authenticated = false;
+    renderAuthStatus();
+    showAuthGate("Você precisa estar logado em sua conta Google Cadastrada para entrar");
+    return false;
+  }
+}
+
+function waitForGoogleIdentity() {
+  if (window.google?.accounts?.id) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve, reject) => {
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      if (window.google?.accounts?.id) {
+        window.clearInterval(timer);
+        resolve();
+        return;
+      }
+
+      if (Date.now() - startedAt > 8000) {
+        window.clearInterval(timer);
+        reject(new Error("Login Google indisponivel neste navegador."));
+      }
+    }, 100);
+  });
+}
+
+function requestGoogleCredential() {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timeout = window.setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        reject(new Error("Conta Google nao identificada automaticamente."));
+      }
+    }, 12000);
+
+    window.google.accounts.id.initialize({
+      client_id: CONFIG.googleClientId,
+      auto_select: true,
+      cancel_on_tap_outside: false,
+      itp_support: true,
+      callback(response) {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        window.clearTimeout(timeout);
+        if (response?.credential) {
+          resolve(response.credential);
+        } else {
+          reject(new Error("Conta Google nao autorizada."));
+        }
+      },
+    });
+
+    window.google.accounts.id.prompt((notification) => {
+      if (settled) {
+        return;
+      }
+      if (notification.isNotDisplayed?.() || notification.isSkippedMoment?.()) {
+        settled = true;
+        window.clearTimeout(timeout);
+        reject(new Error("Conta Google nao identificada automaticamente."));
+      }
+    });
+  });
+}
+
+async function validateGoogleCredential(idToken) {
+  if (!state.config.scriptUrl) {
+    throw new Error("URL do Apps Script nao configurada.");
+  }
+
+  const response = await fetch(state.config.scriptUrl, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({
+      action: "auth",
+      authToken: idToken,
+    }),
+  });
+  const result = await response.json();
+
+  if (!response.ok || result.ok !== true) {
+    throw new Error(result.message || "Conta Google nao autorizada.");
+  }
+
+  return result;
+}
+
+function showAuthGate(message) {
+  if (authMessageEl) {
+    authMessageEl.textContent = message;
+  }
+  authGateEl?.removeAttribute("hidden");
+  document.body.classList.add("auth-locked");
+}
+
+function hideAuthGate() {
+  authGateEl?.setAttribute("hidden", "");
+  document.body.classList.remove("auth-locked");
+}
+
+function renderAuthStatus() {
+  if (!authUserEl) {
+    return;
+  }
+
+  if (state.authenticated && state.auth?.email) {
+    authUserEl.textContent = state.auth.email;
+    authUserEl.className = "status-pill";
+    return;
+  }
+
+  authUserEl.textContent = "Acesso restrito";
+  authUserEl.className = "status-pill neutral";
+}
+
+function getJwtExpirationMs(token) {
+  try {
+    const [, payload] = String(token || "").split(".");
+    const json = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
+    return Number(json.exp || 0) * 1000;
+  } catch {
+    return 0;
+  }
+}
+
+function ensureAuthenticated() {
+  if (!state.authenticated || !state.auth?.token) {
+    throw new Error("Você precisa estar logado em sua conta Google Cadastrada para entrar");
+  }
+
+  if (state.auth.expiresAt && Date.now() > state.auth.expiresAt - 60000) {
+    state.authenticated = false;
+    renderAuthStatus();
+    showAuthGate("Você precisa estar logado em sua conta Google Cadastrada para entrar");
+    throw new Error("Você precisa estar logado em sua conta Google Cadastrada para entrar");
+  }
+
+  return state.auth;
+}
+
+function addAuthToUrl(url) {
+  const auth = ensureAuthenticated();
+  url.searchParams.set("authToken", auth.token);
+  return url;
+}
+
+function withAuthPayload(payload) {
+  const auth = ensureAuthenticated();
+  return {
+    ...payload,
+    authToken: auth.token,
+    userEmail: auth.email,
+  };
 }
 
 function loadConfig() {
@@ -166,6 +365,7 @@ async function loadMetadata() {
   try {
     const url = new URL(state.config.scriptUrl);
     url.searchParams.set("action", "metadata");
+    addAuthToUrl(url);
     const response = await fetch(url.toString(), { method: "GET" });
     const result = await response.json();
 
@@ -322,13 +522,14 @@ async function extractLabelWithAi(imageBlob) {
   const imageDataUrl = await blobToDataUrl(imageBlob);
   const url = new URL(state.config.scriptUrl);
   url.searchParams.set("action", "aiExtract");
+  addAuthToUrl(url);
   const response = await fetch(url.toString(), {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({
+    body: JSON.stringify(withAuthPayload({
       action: "aiExtract",
       imageDataUrl,
-    }),
+    })),
   });
 
   const result = await response.json();
@@ -388,6 +589,7 @@ function collectFormData() {
     credor: fields.credor.value.trim(),
     plantonistas: isCaixa ? "" : getSelectedPlantonistasValue(),
     observacoes: "",
+    userEmail: state.auth?.email || "",
     userAgent: navigator.userAgent,
   };
 }
@@ -427,7 +629,7 @@ async function sendToSheet() {
     const response = await fetch(state.config.scriptUrl, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(withAuthPayload(payload)),
     });
 
     const result = await response.json();
@@ -542,6 +744,7 @@ async function loadSummary(options = {}) {
     const url = new URL(state.config.scriptUrl);
     url.searchParams.set("action", "summary");
     url.searchParams.set("date", summaryDateEl.value || getTodayISO());
+    addAuthToUrl(url);
     const response = await fetch(url.toString(), { method: "GET" });
     const result = await response.json();
 
@@ -724,11 +927,11 @@ async function saveSelectedObservation() {
     const response = await fetch(state.config.scriptUrl, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({
+      body: JSON.stringify(withAuthPayload({
         action: "updateObservation",
         rowNumber: state.selectedObservationRow.rowNumber,
         observacoes,
-      }),
+      })),
     });
     const result = await response.json();
 
@@ -798,6 +1001,7 @@ async function loadMonthlyEntries(month) {
   const url = new URL(state.config.scriptUrl);
   url.searchParams.set("action", "summaryMonth");
   url.searchParams.set("month", month);
+  addAuthToUrl(url);
   const response = await fetch(url.toString(), { method: "GET" });
   const result = await response.json();
 

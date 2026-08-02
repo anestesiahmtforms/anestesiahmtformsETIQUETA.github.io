@@ -4,6 +4,65 @@ const REGISTROS_SHEET = "ETIQUETA";
 const LISTAS_SHEET = "Listas";
 const OPENAI_MODEL = "gpt-5.6";
 const OPENAI_API_KEY_PROPERTY = "OPENAI_API_KEY";
+const GOOGLE_CLIENT_ID = "908976987584-o59p0obmvq013lg3t9726itf06e15v2c.apps.googleusercontent.com";
+const AUTH_REQUIRED_MESSAGE = "Você precisa estar logado em sua conta Google Cadastrada para entrar";
+const AUTHORIZED_EMAILS = [
+  "giovannoni1806@gmail.com",
+  "igorfagundesvieira@gmail.com",
+  "jaymebc@gmail.com",
+  "lalvesaraujo1@gmail.com",
+  "leodcp1@gmail.com",
+  "luc3101@gmail.com",
+  "lucas.cardoso.andrade@gmail.com",
+  "luciah1509@gmail.com",
+  "macielfonseca@gmail.com",
+  "marcio.henrique82@gmail.com",
+  "deilerjeunon19@gmail.com",
+  "deneradiniz@gmail.com",
+  "digoanest@gmail.com",
+  "ericardolucas@gmail.com",
+  "rafael.augusto.rezende@gmail.com",
+  "rodrigocapuano12@gmail.com",
+  "vcrelio@gmail.com",
+  "wx2064@gmail.com",
+  "25.guilherme@gmail.com",
+  "adelsonjm@gmail.com",
+  "adrianonevesdealmeida1966@gmail.com",
+  "barbararcoutinho@gmail.com",
+  "bovino3.lf@gmail.com",
+  "wendellvcp@gmail.com",
+  "gpbicalho@gmail.com",
+  "decastromorais@gmail.com",
+  "luizacs4182@gmail.com",
+  "luizotavio.andrade@gmail.com",
+  "paulorenato12021@gmail.com",
+  "rubenscpinheiro0217@gmail.com",
+  "nyhumberto@gmail.com",
+  "marianasantosbrant@gmail.com",
+  "anacarolinacbo1@gmail.com",
+  "anandaqrlima@gmail.com",
+  "lucasreis611@gmail.com",
+  "araujo.barbaral44@gmail.com",
+  "peereiralana@gmail.com",
+  "bernardofsilvestrini@gmail.com",
+  "eduardorfamaral@gmail.com",
+  "aliciafreire98@gmail.com",
+  "livia.campos12@gmail.com",
+  "isapinvin@gmail.com",
+  "na.tigre0@gmail.com",
+  "matheusspiccolo2@gmail.com",
+  "leonardoantonio2000sg@gmail.com",
+  "joaoboscom28@gmail.com",
+  "igorsmatias@gmail.com",
+  "gbgabri3@gmail.com",
+  "richard.fernandes.sousa@gmail.com",
+  "lucasmarquesdrumond@gmail.com",
+  "beguimaraes3@gmail.com",
+  "brunacandida@gmail.com",
+  "carolassisval@gmail.com",
+  "nandobracar@gmail.com",
+  "vieiraa.jessica09@gmail.com",
+];
 
 const REGISTROS_HEADERS = [
   "Data",
@@ -15,6 +74,9 @@ const REGISTROS_HEADERS = [
   "Plantonista(s)",
   "Observacoes",
   "Criado em",
+  "Criado por",
+  "Observacao atualizada em",
+  "Observacao atualizada por",
 ];
 
 const TIPO_OPTIONS = ["Particular", "Complementação", "Unimed", "Outros"];
@@ -31,6 +93,7 @@ function setup() {
 
 function doGet(e) {
   try {
+    const user = requireAuthorized_(e && e.parameter && e.parameter.authToken);
     const spreadsheet = ensureWorkbook_();
     const action = (e && e.parameter && e.parameter.action) || "";
 
@@ -43,6 +106,7 @@ function doGet(e) {
         tipoOptions: TIPO_OPTIONS,
         credorOptions: CREDOR_OPTIONS,
         plantonistaOptions: PLANTONISTA_OPTIONS,
+        userEmail: user.email,
       });
     }
 
@@ -68,6 +132,7 @@ function doGet(e) {
       ok: true,
       message: "ETIQUETAS HMT API online.",
       spreadsheetName: spreadsheet.getName(),
+      userEmail: user.email,
     });
   } catch (error) {
     return jsonResponse({
@@ -82,6 +147,12 @@ function doPost(e) {
     const payload = JSON.parse((e.postData && e.postData.contents) || "{}");
     const action = String(payload.action || (e.parameter && e.parameter.action) || "").trim();
 
+    if (action === "auth") {
+      return handleAuth_(payload);
+    }
+
+    const user = requireAuthorized_(payload.authToken || (e.parameter && e.parameter.authToken));
+
     if (action === "aiExtract") {
       return handleAiExtract_(payload);
     }
@@ -89,7 +160,7 @@ function doPost(e) {
     ensureWorkbook_();
 
     if (action === "updateObservation") {
-      return handleUpdateObservation_(payload);
+      return handleUpdateObservation_(payload, user);
     }
 
     validatePayload_(payload);
@@ -105,12 +176,16 @@ function doPost(e) {
       payload.plantonistas || "",
       payload.observacoes || "",
       new Date(),
+      user.email,
+      "",
+      "",
     ]);
 
     return jsonResponse({
       ok: true,
       message: "Entrada salva com sucesso.",
       entries: getEntriesByDate_(payload.data),
+      userEmail: user.email,
     });
   } catch (error) {
     return jsonResponse({
@@ -118,6 +193,68 @@ function doPost(e) {
       message: error.message,
     });
   }
+}
+
+function handleAuth_(payload) {
+  const user = requireAuthorized_(payload.authToken);
+  return jsonResponse({
+    ok: true,
+    email: user.email,
+    name: user.name,
+  });
+}
+
+function requireAuthorized_(idToken) {
+  const token = String(idToken || "").trim();
+  if (!token) {
+    throw new Error(AUTH_REQUIRED_MESSAGE);
+  }
+
+  const user = verifyGoogleToken_(token);
+  const email = String(user.email || "").toLowerCase();
+  if (!email || AUTHORIZED_EMAILS.indexOf(email) === -1) {
+    throw new Error(AUTH_REQUIRED_MESSAGE);
+  }
+
+  return {
+    email,
+    name: user.name || "",
+  };
+}
+
+function verifyGoogleToken_(idToken) {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = "google-id-token:" + Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, idToken)
+    .map(function(byte) {
+      return ("0" + (byte & 0xff).toString(16)).slice(-2);
+    })
+    .join("");
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    return JSON.parse(cached);
+  }
+
+  const response = UrlFetchApp.fetch("https://oauth2.googleapis.com/tokeninfo?id_token=" + encodeURIComponent(idToken), {
+    method: "get",
+    muteHttpExceptions: true,
+  });
+  const status = response.getResponseCode();
+  const content = response.getContentText();
+  if (status < 200 || status >= 300) {
+    throw new Error(AUTH_REQUIRED_MESSAGE);
+  }
+
+  const data = JSON.parse(content);
+  if (String(data.aud || "") !== GOOGLE_CLIENT_ID) {
+    throw new Error(AUTH_REQUIRED_MESSAGE);
+  }
+
+  if (String(data.email_verified || "") !== "true") {
+    throw new Error(AUTH_REQUIRED_MESSAGE);
+  }
+
+  cache.put(cacheKey, JSON.stringify(data), 300);
+  return data;
 }
 
 function handleAiExtract_(payload) {
@@ -295,7 +432,7 @@ function validatePayload_(payload) {
   }
 }
 
-function handleUpdateObservation_(payload) {
+function handleUpdateObservation_(payload, user) {
   const rowNumber = Number(payload.rowNumber || 0);
   if (!Number.isInteger(rowNumber) || rowNumber < 2) {
     throw new Error("Registro invalido para atualizar observacao.");
@@ -307,11 +444,16 @@ function handleUpdateObservation_(payload) {
   }
 
   const observacoesColumn = REGISTROS_HEADERS.indexOf("Observacoes") + 1;
+  const observacaoAtualizadaEmColumn = REGISTROS_HEADERS.indexOf("Observacao atualizada em") + 1;
+  const observacaoAtualizadaPorColumn = REGISTROS_HEADERS.indexOf("Observacao atualizada por") + 1;
   sheet.getRange(rowNumber, observacoesColumn).setValue(String(payload.observacoes || "").trim());
+  sheet.getRange(rowNumber, observacaoAtualizadaEmColumn).setValue(new Date());
+  sheet.getRange(rowNumber, observacaoAtualizadaPorColumn).setValue(user.email);
 
   return jsonResponse({
     ok: true,
     message: "Observacao atualizada com sucesso.",
+    userEmail: user.email,
     entry: rowToEntry_(sheet.getRange(rowNumber, 1, 1, REGISTROS_HEADERS.length).getDisplayValues()[0], rowNumber),
   });
 }
@@ -362,6 +504,9 @@ function rowToEntry_(row, rowNumber) {
     plantonistas: row[6],
     observacoes: row[7],
     criadoEm: row[8],
+    criadoPor: row[9],
+    observacaoAtualizadaEm: row[10],
+    observacaoAtualizadaPor: row[11],
   };
 }
 

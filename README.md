@@ -33,12 +33,28 @@ Antes do envio, o app mostra uma confirmacao para conferencia dos dados.
 
 O campo `Observacoes` nao aparece mais na entrada principal. Para sinalizar um registro depois do envio:
 
-1. Selecione o mes em `Relatorio mensal`.
-2. Em `Observacoes do mes`, busque por nome, cirurgia ou atendimento.
+1. Abaixo de `Resumo do dia`, selecione o mes em `Observacoes de Registros lancados`.
+2. Busque por nome, cirurgia ou atendimento.
 3. Toque no registro desejado.
 4. Digite a observacao e toque em `Salvar observacao`.
 
-A observacao e gravada somente naquele registro especifico da aba `ETIQUETA`.
+A observacao e gravada somente naquele registro especifico da aba `ETIQUETA`, junto com a data e o usuario que fez a alteracao.
+
+## Acesso restrito
+
+O app usa Google Identity Services com entrada automatica quando o usuario ja esta logado no Google. Quem nao estiver logado em uma conta autorizada recebe a mensagem:
+
+```text
+Você precisa estar logado em sua conta Google Cadastrada para entrar
+```
+
+O bloqueio existe tambem no `apps-script/Code.gs`, que valida o token do Google antes de ler resumo, chamar a IA, salvar registro ou alterar observacoes.
+
+Client ID configurado no PWA:
+
+```text
+908976987584-o59p0obmvq013lg3t9726itf06e15v2c.apps.googleusercontent.com
+```
 
 ## Planilha Google
 
@@ -59,7 +75,7 @@ O Apps Script em `apps-script/Code.gs` cria e ajusta automaticamente:
 Cabecalho esperado da aba `ETIQUETA`:
 
 ```text
-Data | Nome do Paciente | Cirurgia | Atendimento | Tipo | Credor | Plantonista(s) | Observacoes | Criado em
+Data | Nome do Paciente | Cirurgia | Atendimento | Tipo | Credor | Plantonista(s) | Observacoes | Criado em | Criado por | Observacao atualizada em | Observacao atualizada por
 ```
 
 ## Como ativar a IA
