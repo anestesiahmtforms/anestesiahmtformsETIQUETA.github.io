@@ -1083,6 +1083,7 @@ function renderObservationList(customEmptyMessage = "") {
       <span>Data ${escapeHtml(formatDate(row.data || ""))} | Cirurgia ${escapeHtml(row.cirurgia || "")} | Atendimento ${escapeHtml(row.atendimento || "")}</span>
       <small>Tipo: ${escapeHtml(row.tipo || "-")} | Credor: ${escapeHtml(row.credor || "-")} | Plantonista(s): ${escapeHtml(row.plantonistas || "Nao necessario")}</small>
       <small>Observação atual: ${escapeHtml(row.observacoes || "Sem observação")}</small>
+      <small>Observação feita por: ${escapeHtml(row.observacaoAtualizadaPor || "Sem observação registrada")}</small>
     </button>
   `).join("");
 
@@ -1104,7 +1105,7 @@ function selectObservationRow(rowNumber) {
   state.selectedObservationRow = selected;
   observationEditorEl.hidden = false;
   observationTextEl.value = extractObservationBody(selected.observacoes || "");
-  observationTargetEl.textContent = `${formatDate(selected.data || "")} | ${selected.nomePaciente || ""} | Cirurgia ${selected.cirurgia || ""} | Atendimento ${selected.atendimento || ""} | ${selected.tipo || ""} | ${selected.credor || ""} | Plantonista(s): ${selected.plantonistas || "Nao necessario"}`;
+  observationTargetEl.textContent = `${formatDate(selected.data || "")} | ${selected.nomePaciente || ""} | Cirurgia ${selected.cirurgia || ""} | Atendimento ${selected.atendimento || ""} | ${selected.tipo || ""} | ${selected.credor || ""} | Plantonista(s): ${selected.plantonistas || "Nao necessario"} | Lancado por: ${selected.criadoPor || "Nao informado"} | Observacao feita por: ${selected.observacaoAtualizadaPor || "Sem observacao registrada"}`;
   observationDateEl.textContent = `Data desta observação: ${formatDate(getTodayISO())}`;
   setObservationFeedback("", "neutral");
   observationTextEl.focus();
@@ -1152,6 +1153,9 @@ async function saveSelectedObservation() {
     const searchTerm = state.selectedObservationRow.nomePaciente || "";
     setObservationFeedback("Observação salva com sucesso!", "success");
     observationSearchEl.value = searchTerm;
+    if (result.entry) {
+      state.selectedObservationRow = result.entry;
+    }
     await loadSummary({ silent: true });
     await loadMonthlySummary({ silent: true });
     await loadObservationRecords({ silent: true });
