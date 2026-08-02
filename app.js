@@ -23,6 +23,7 @@ const state = {
   config: loadConfig(),
   summaryRows: [],
   monthlyRows: [],
+  observationRows: [],
   selectedObservationRow: null,
 };
 
@@ -44,10 +45,12 @@ const confirmOverlayEl = document.querySelector("#confirm-overlay");
 const confirmSummaryEl = document.querySelector("#confirm-summary");
 const confirmSendEl = document.querySelector("#confirm-send");
 const cancelSendEl = document.querySelector("#cancel-send");
+const observationMonthEl = document.querySelector("#observation-month");
 const observationSearchEl = document.querySelector("#observation-search");
 const observationListEl = document.querySelector("#observation-list");
 const observationEditorEl = document.querySelector("#observation-editor");
 const observationTargetEl = document.querySelector("#observation-target");
+const observationDateEl = document.querySelector("#observation-date");
 const observationTextEl = document.querySelector("#observation-text");
 const saveObservationEl = document.querySelector("#save-observation");
 const cancelObservationEl = document.querySelector("#cancel-observation");
@@ -81,6 +84,7 @@ document.querySelector("#generate-month-pdf-whatsapp").addEventListener("click",
 summaryDateEl.addEventListener("change", loadSummary);
 reportMonthEl.addEventListener("change", loadMonthlySummary);
 fields.credor.addEventListener("change", syncPlantonistasRequirement);
+observationMonthEl.addEventListener("change", loadObservationRecords);
 observationSearchEl.addEventListener("input", renderObservationList);
 saveObservationEl.addEventListener("click", saveSelectedObservation);
 cancelObservationEl.addEventListener("click", clearObservationSelection);
@@ -100,6 +104,7 @@ async function bootstrap() {
   fields.data.value = today;
   summaryDateEl.value = today;
   reportMonthEl.value = today.slice(0, 7);
+  setupObservationMonthOptions(today);
   scriptUrlEl.value = state.config.scriptUrl;
   setupPlantonistasPicker();
   syncPlantonistasRequirement();
@@ -107,6 +112,7 @@ async function bootstrap() {
   await loadMetadata();
   await loadSummary({ silent: true });
   await loadMonthlySummary({ silent: true });
+  await loadObservationRecords({ silent: true });
   registerServiceWorker();
 }
 
@@ -129,6 +135,7 @@ async function saveSettings() {
   await loadMetadata();
   await loadSummary({ silent: true });
   await loadMonthlySummary({ silent: true });
+  await loadObservationRecords({ silent: true });
   setStatus("URL do Apps Script salva neste aparelho.", "success");
 }
 
@@ -434,6 +441,7 @@ async function sendToSheet() {
     reportMonthEl.value = sentDate.slice(0, 7);
     await loadSummary({ silent: true });
     await loadMonthlySummary({ silent: true });
+    await loadObservationRecords({ silent: true });
     setSendFeedback("Dados enviados com sucesso!", "success");
     setStatus("Dados enviados com sucesso!", "success");
   } catch (error) {
@@ -517,6 +525,7 @@ async function refreshDisplayedSummaries() {
   const refreshTasks = [loadSummary({ silent: true })];
   if (observationEditorEl.hidden) {
     refreshTasks.push(loadMonthlySummary({ silent: true }));
+    refreshTasks.push(loadObservationRecords({ silent: true }));
   }
 
   await Promise.all(refreshTasks);
@@ -564,7 +573,6 @@ async function loadMonthlySummary(options = {}) {
   const month = reportMonthEl.value || getTodayISO().slice(0, 7);
   try {
     state.monthlyRows = await loadMonthlyEntries(month);
-    renderObservationList();
     const alertCount = state.monthlyRows.filter((row) => isAlertType(row.tipo)).length;
     const updatedAt = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
     renderMonthlyStatus(
@@ -577,7 +585,6 @@ async function loadMonthlySummary(options = {}) {
     }
   } catch (error) {
     state.monthlyRows = [];
-    renderObservationList("Nao foi possivel carregar os registros do mês.");
     renderMonthlyStatus(`Nao foi possivel atualizar o relatorio mensal: ${error.message}`, "error");
     if (!options.silent) {
       setStatus(`Falha ao atualizar relatorio mensal: ${error.message}`, "error");
@@ -590,16 +597,53 @@ function renderMonthlyStatus(message, tone = "neutral") {
   monthlyStatusEl.dataset.tone = tone;
 }
 
+function setupObservationMonthOptions(todayIso) {
+  const [year, month] = todayIso.split("-").map(Number);
+  const options = [];
+
+  for (let offset = 0; offset < 3; offset += 1) {
+    const date = new Date(year, month - 1 - offset, 1);
+    const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    options.push(`<option value="${value}">${formatMonth(value)}</option>`);
+  }
+
+  observationMonthEl.innerHTML = options.join("");
+}
+
+async function loadObservationRecords(options = {}) {
+  if (!state.config.scriptUrl) {
+    state.observationRows = [];
+    renderObservationList("Configure a URL do Apps Script para carregar os registros.");
+    return;
+  }
+
+  try {
+    const month = observationMonthEl.value || getTodayISO().slice(0, 7);
+    state.observationRows = await loadMonthlyEntries(month);
+    renderObservationList();
+    if (!options.silent) {
+      setObservationFeedback(`Registros de ${formatMonth(month)} carregados.`, "success");
+    }
+  } catch (error) {
+    state.observationRows = [];
+    renderObservationList(`Nao foi possivel carregar os registros: ${error.message}`);
+    if (!options.silent) {
+      setObservationFeedback(`Falha ao carregar registros: ${error.message}`, "error");
+    }
+  }
+}
+
 function renderObservationList(customEmptyMessage = "") {
   clearObservationSelection({ keepFeedback: true });
 
   const query = normalizeSearch(observationSearchEl.value);
-  const rows = state.monthlyRows.filter((row) => {
+  const rows = state.observationRows.filter((row) => {
     if (!query) {
       return false;
     }
 
     return normalizeSearch([
+      row.data,
       row.nomePaciente,
       row.cirurgia,
       row.atendimento,
@@ -610,7 +654,7 @@ function renderObservationList(customEmptyMessage = "") {
     ].join(" ")).includes(query);
   }).slice(0, CONFIG.maxObservationResults);
 
-  if (!state.monthlyRows.length) {
+  if (!state.observationRows.length) {
     observationListEl.innerHTML = `<p class="empty-state">${escapeHtml(customEmptyMessage || "Nenhum registro carregado para o mês selecionado.")}</p>`;
     return;
   }
@@ -628,8 +672,9 @@ function renderObservationList(customEmptyMessage = "") {
   observationListEl.innerHTML = rows.map((row) => `
     <button class="observation-result" type="button" data-row-number="${escapeHtml(row.rowNumber || "")}">
       <strong>${escapeHtml(row.nomePaciente || "")}</strong>
-      <span>Cirurgia ${escapeHtml(row.cirurgia || "")} | Atendimento ${escapeHtml(row.atendimento || "")}</span>
-      <small>${escapeHtml(row.tipo || "")} - ${escapeHtml(row.credor || "")}${row.observacoes ? " - com observação" : ""}</small>
+      <span>Data ${escapeHtml(formatDate(row.data || ""))} | Cirurgia ${escapeHtml(row.cirurgia || "")} | Atendimento ${escapeHtml(row.atendimento || "")}</span>
+      <small>Tipo: ${escapeHtml(row.tipo || "-")} | Credor: ${escapeHtml(row.credor || "-")} | Plantonista(s): ${escapeHtml(row.plantonistas || "Nao necessario")}</small>
+      <small>Observação atual: ${escapeHtml(row.observacoes || "Sem observação")}</small>
     </button>
   `).join("");
 
@@ -639,15 +684,16 @@ function renderObservationList(customEmptyMessage = "") {
 }
 
 function selectObservationRow(rowNumber) {
-  const selected = state.monthlyRows.find((row) => String(row.rowNumber) === String(rowNumber));
+  const selected = state.observationRows.find((row) => String(row.rowNumber) === String(rowNumber));
   if (!selected) {
     return;
   }
 
   state.selectedObservationRow = selected;
   observationEditorEl.hidden = false;
-  observationTextEl.value = selected.observacoes || "";
-  observationTargetEl.textContent = `${selected.nomePaciente || ""} | Cirurgia ${selected.cirurgia || ""} | Atendimento ${selected.atendimento || ""}`;
+  observationTextEl.value = extractObservationBody(selected.observacoes || "");
+  observationTargetEl.textContent = `${formatDate(selected.data || "")} | ${selected.nomePaciente || ""} | Cirurgia ${selected.cirurgia || ""} | Atendimento ${selected.atendimento || ""} | ${selected.tipo || ""} | ${selected.credor || ""} | Plantonista(s): ${selected.plantonistas || "Nao necessario"}`;
+  observationDateEl.textContent = `Data desta observação: ${formatDate(getTodayISO())}`;
   setObservationFeedback("", "neutral");
   observationTextEl.focus();
 }
@@ -656,6 +702,7 @@ function clearObservationSelection(options = {}) {
   state.selectedObservationRow = null;
   observationEditorEl.hidden = true;
   observationTargetEl.textContent = "";
+  observationDateEl.textContent = "";
   observationTextEl.value = "";
   if (!options.keepFeedback) {
     setObservationFeedback("", "neutral");
@@ -668,7 +715,8 @@ async function saveSelectedObservation() {
     return;
   }
 
-  const observacoes = observationTextEl.value.trim();
+  const observationBody = observationTextEl.value.trim();
+  const observacoes = observationBody ? `${formatDate(getTodayISO())} - ${observationBody}` : "";
   toggleBusy(true);
   setObservationFeedback("Salvando observação...", "neutral");
 
@@ -693,6 +741,7 @@ async function saveSelectedObservation() {
     observationSearchEl.value = searchTerm;
     await loadSummary({ silent: true });
     await loadMonthlySummary({ silent: true });
+    await loadObservationRecords({ silent: true });
   } catch (error) {
     setObservationFeedback(`Falha ao salvar observação: ${error.message}`, "error");
   } finally {
@@ -704,6 +753,10 @@ function setObservationFeedback(message, tone = "neutral") {
   observationFeedbackEl.textContent = message;
   observationFeedbackEl.dataset.tone = tone;
   observationFeedbackEl.hidden = !message;
+}
+
+function extractObservationBody(value) {
+  return String(value || "").replace(/^\d{2}\/\d{2}\/\d{4}\s*-\s*/, "").trim();
 }
 
 function renderSummary(rows, emptyMessage = "Nenhuma entrada encontrada nesta data.") {
@@ -829,7 +882,6 @@ async function generateMonthlyPdfForWhatsApp() {
   try {
     const rows = await loadMonthlyEntries(month);
     state.monthlyRows = rows;
-    renderObservationList();
     const alertCount = rows.filter((row) => isAlertType(row.tipo)).length;
     renderMonthlyStatus(`${rows.length} entrada(s) em ${formatMonth(month)}. ${alertCount} alerta(s).`, rows.length ? "success" : "neutral");
     if (!rows.length) {

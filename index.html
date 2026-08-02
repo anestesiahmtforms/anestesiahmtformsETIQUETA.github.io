@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b3f3a">
   <title>ETIQUETAS HMT</title>
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./styles.css?v=26">
+  <link rel="stylesheet" href="./styles.css?v=27">
 </head>
 <body>
   <div class="app-shell">
@@ -173,8 +173,13 @@
 
       <section class="panel observations-panel">
         <div class="section-title">
-          <h2>Observações do mês</h2>
+          <h2>Observações de Registros lançados</h2>
         </div>
+
+        <label class="full-width">
+          <span>Mês dos registros</span>
+          <select id="observation-month"></select>
+        </label>
 
         <label class="full-width">
           <span>Buscar registro do mês selecionado</span>
@@ -182,11 +187,12 @@
         </label>
 
         <div id="observation-list" class="observation-list">
-          <p class="empty-state">Carregue o mês e busque um registro para criar observação.</p>
+          <p class="empty-state">Selecione o mês e busque um registro para criar observação.</p>
         </div>
 
         <div id="observation-editor" class="observation-editor" hidden>
           <p id="observation-target" class="observation-target"></p>
+          <p id="observation-date" class="observation-date"></p>
           <label>
             <span>Observação para este registro</span>
             <textarea id="observation-text" rows="4" placeholder="Digite a observação deste registro"></textarea>
@@ -247,6 +253,6 @@
       }
     })();
   </script>
-  <script src="./app.js?v=26" type="module"></script>
+  <script src="./app.js?v=27" type="module"></script>
 </body>
 </html>

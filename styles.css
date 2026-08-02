@@ -74,6 +74,30 @@ h2 {
   gap: 14px;
 }
 
+.scanner-panel {
+  order: 1;
+}
+
+.form-panel {
+  order: 2;
+}
+
+.summary-panel {
+  order: 3;
+}
+
+.observations-panel {
+  order: 4;
+}
+
+.monthly-panel {
+  order: 5;
+}
+
+.settings-panel {
+  order: 6;
+}
+
 .panel {
   background: var(--surface);
   border: 1px solid rgba(255, 255, 255, 0.72);
@@ -596,6 +620,17 @@ textarea {
   line-height: 1.3;
 }
 
+.observation-date {
+  margin: 0 0 12px;
+  padding: 9px 11px;
+  border: 1px solid rgba(217, 154, 36, 0.4);
+  border-radius: var(--radius);
+  background: #fffaf0;
+  color: #7a4b00;
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
 .summary-totals {
   display: flex;
   gap: 8px;
@@ -703,6 +738,7 @@ textarea {
   }
 
   .summary-panel,
+  .observations-panel,
   .settings-panel {
     grid-column: 1 / -1;
   }
