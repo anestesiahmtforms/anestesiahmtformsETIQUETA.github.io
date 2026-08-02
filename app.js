@@ -24,6 +24,7 @@ const state = {
   config: loadConfig(),
   summaryRows: [],
   monthlyRows: [],
+  monthlyMonth: "",
   observationRows: [],
   selectedObservationRow: null,
   auth: null,
@@ -981,6 +982,7 @@ async function loadMonthlySummary(options = {}) {
   const month = reportMonthEl.value || getTodayISO().slice(0, 7);
   try {
     state.monthlyRows = await loadMonthlyEntries(month);
+    state.monthlyMonth = month;
     const alertCount = state.monthlyRows.filter((row) => isAlertType(row.tipo)).length;
     const updatedAt = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
     renderMonthlyStatus(
@@ -993,6 +995,7 @@ async function loadMonthlySummary(options = {}) {
     }
   } catch (error) {
     state.monthlyRows = [];
+    state.monthlyMonth = "";
     renderMonthlyStatus(`Nao foi possivel atualizar o relatorio mensal: ${error.message}`, "error");
     if (!options.silent) {
       setStatus(`Falha ao atualizar relatorio mensal: ${error.message}`, "error");
@@ -1064,7 +1067,7 @@ function renderObservationList(customEmptyMessage = "") {
     return;
   }
 
-  if (!query && rows.length === 0) {
+  if (!query) {
     observationListEl.innerHTML = `<p class="empty-state">Digite nome, cirurgia ou atendimento para localizar o registro deste mês.</p>`;
     return;
   }
@@ -1288,17 +1291,28 @@ function generatePdfReport() {
 
 async function generateMonthlyPdfForWhatsApp() {
   const month = reportMonthEl.value || getTodayISO().slice(0, 7);
-  const preOpenedWhatsApp = window.open("about:blank", "_blank");
   toggleBusy(true);
   setStatus("Gerando relatorio mensal em PDF...", "info");
 
   try {
-    const rows = await loadMonthlyEntries(month);
-    state.monthlyRows = rows;
+    let rows = state.monthlyMonth === month ? state.monthlyRows : [];
+    if (!rows.length) {
+      rows = await loadMonthlyEntries(month);
+      state.monthlyRows = rows;
+      state.monthlyMonth = month;
+      const alertCount = rows.filter((row) => isAlertType(row.tipo)).length;
+      renderMonthlyStatus(`${rows.length} entrada(s) em ${formatMonth(month)}. ${alertCount} alerta(s).`, rows.length ? "success" : "neutral");
+      if (!rows.length) {
+        setStatus("Nenhuma entrada encontrada para o mes selecionado.", "error");
+        return;
+      }
+      setStatus("Relatorio mensal carregado. Toque novamente em PDF Mensal no WhatsApp para anexar automaticamente.", "info");
+      return;
+    }
+
     const alertCount = rows.filter((row) => isAlertType(row.tipo)).length;
     renderMonthlyStatus(`${rows.length} entrada(s) em ${formatMonth(month)}. ${alertCount} alerta(s).`, rows.length ? "success" : "neutral");
     if (!rows.length) {
-      preOpenedWhatsApp?.close?.();
       setStatus("Nenhuma entrada encontrada para o mes selecionado.", "error");
       return;
     }
@@ -1313,23 +1327,21 @@ async function generateMonthlyPdfForWhatsApp() {
           title: `ETIQUETAS SAHMT - ${formatMonth(month)}`,
           text: summaryText,
         });
-        preOpenedWhatsApp?.close?.();
         setStatus("PDF mensal pronto para envio. Escolha o WhatsApp na tela de compartilhamento.", "success");
         return;
       } catch (shareError) {
         if (shareError.name === "AbortError") {
-          preOpenedWhatsApp?.close?.();
           setStatus("Compartilhamento cancelado.", "info");
           return;
         }
+        throw shareError;
       }
     }
 
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(`${summaryText}\n\nEste navegador nao permitiu anexar o PDF automaticamente.`)}`;
-    openWhatsAppUrl(whatsappUrl, preOpenedWhatsApp);
+    openWhatsAppUrl(whatsappUrl);
     setStatus("WhatsApp aberto. Este navegador nao permitiu anexar o PDF automaticamente.", "info");
   } catch (error) {
-    preOpenedWhatsApp?.close?.();
     setStatus(`Falha ao gerar relatorio mensal: ${error.message}`, "error");
   } finally {
     toggleBusy(false);
