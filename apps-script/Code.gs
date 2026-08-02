@@ -5,6 +5,8 @@ const LISTAS_SHEET = "Listas";
 const OPENAI_MODEL = "gpt-5.2";
 const OPENAI_API_KEY_PROPERTY = "OPENAI_API_KEY";
 const GOOGLE_CLIENT_ID = "908976987584-o59p0obmvq013lg3t9726itf06e15v2c.apps.googleusercontent.com";
+const TRUSTED_DEVICES_PROPERTY = "TRUSTED_DEVICES_JSON";
+const TRUSTED_DEVICE_DAYS = 30;
 const AUTH_REQUIRED_MESSAGE = "Você precisa estar logado em sua conta Google Cadastrada para entrar";
 const AUTHORIZED_EMAILS = [
   "giovannoni1806@gmail.com",
@@ -93,7 +95,10 @@ function setup() {
 
 function doGet(e) {
   try {
-    const user = requireAuthorized_(e && e.parameter && e.parameter.authToken);
+    const user = requireAuthorized_(
+      e && e.parameter && e.parameter.authToken,
+      e && e.parameter && e.parameter.deviceToken
+    );
     const spreadsheet = ensureWorkbook_();
     const action = (e && e.parameter && e.parameter.action) || "";
 
@@ -151,7 +156,10 @@ function doPost(e) {
       return handleAuth_(payload);
     }
 
-    const user = requireAuthorized_(payload.authToken || (e.parameter && e.parameter.authToken));
+    const user = requireAuthorized_(
+      payload.authToken || (e.parameter && e.parameter.authToken),
+      payload.deviceToken || (e.parameter && e.parameter.deviceToken)
+    );
 
     if (action === "aiHealth") {
       return handleAiHealth_(user);
@@ -206,12 +214,20 @@ function doPost(e) {
 }
 
 function handleAuth_(payload) {
-  const user = requireAuthorized_(payload.authToken);
-  return jsonResponse({
+  const user = payload.authToken
+    ? requireAuthorized_(payload.authToken, "")
+    : requireAuthorized_("", payload.deviceToken);
+  const response = {
     ok: true,
     email: user.email,
     name: user.name,
-  });
+  };
+
+  if (payload.authToken && payload.deviceToken) {
+    response.trustedDeviceExpiresAt = registerTrustedDevice_(payload.deviceToken, user);
+  }
+
+  return jsonResponse(response);
 }
 
 function handleAiHealth_(user) {
@@ -240,7 +256,12 @@ function handleAiHealth_(user) {
   });
 }
 
-function requireAuthorized_(idToken) {
+function requireAuthorized_(idToken, deviceToken) {
+  const trustedUser = verifyTrustedDevice_(deviceToken);
+  if (trustedUser) {
+    return trustedUser;
+  }
+
   const token = String(idToken || "").trim();
   if (!token) {
     throw new Error(AUTH_REQUIRED_MESSAGE);
@@ -256,6 +277,75 @@ function requireAuthorized_(idToken) {
     email,
     name: user.name || "",
   };
+}
+
+function registerTrustedDevice_(deviceToken, user) {
+  const token = normalizeDeviceToken_(deviceToken);
+  if (!token) {
+    return "";
+  }
+
+  const expiresAt = Date.now() + TRUSTED_DEVICE_DAYS * 24 * 60 * 60 * 1000;
+  const devices = getTrustedDevices_();
+  devices[token] = {
+    email: String(user.email || "").toLowerCase(),
+    name: user.name || "",
+    expiresAt,
+  };
+  saveTrustedDevices_(devices);
+  return new Date(expiresAt).toISOString();
+}
+
+function verifyTrustedDevice_(deviceToken) {
+  const token = normalizeDeviceToken_(deviceToken);
+  if (!token) {
+    return null;
+  }
+
+  const devices = getTrustedDevices_();
+  const record = devices[token];
+  if (!record || Number(record.expiresAt || 0) <= Date.now()) {
+    if (record) {
+      delete devices[token];
+      saveTrustedDevices_(devices);
+    }
+    return null;
+  }
+
+  const email = String(record.email || "").toLowerCase();
+  if (!email || AUTHORIZED_EMAILS.indexOf(email) === -1) {
+    delete devices[token];
+    saveTrustedDevices_(devices);
+    return null;
+  }
+
+  return {
+    email,
+    name: record.name || "",
+  };
+}
+
+function getTrustedDevices_() {
+  try {
+    return JSON.parse(PropertiesService.getScriptProperties().getProperty(TRUSTED_DEVICES_PROPERTY) || "{}");
+  } catch (error) {
+    return {};
+  }
+}
+
+function saveTrustedDevices_(devices) {
+  const now = Date.now();
+  Object.keys(devices).forEach(function(token) {
+    if (Number(devices[token].expiresAt || 0) <= now) {
+      delete devices[token];
+    }
+  });
+  PropertiesService.getScriptProperties().setProperty(TRUSTED_DEVICES_PROPERTY, JSON.stringify(devices));
+}
+
+function normalizeDeviceToken_(deviceToken) {
+  const token = String(deviceToken || "").trim();
+  return /^[a-f0-9]{64}$/i.test(token) ? token.toLowerCase() : "";
 }
 
 function verifyGoogleToken_(idToken) {

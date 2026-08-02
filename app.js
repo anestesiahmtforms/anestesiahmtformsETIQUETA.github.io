@@ -1,6 +1,7 @@
 const CONFIG = {
   storageKey: "etiqueta-hmt-ia-v1",
   authSessionKey: "etiqueta-hmt-auth-session-v1",
+  trustedDeviceKey: "etiqueta-hmt-trusted-device-v1",
   googleClientId: "908976987584-o59p0obmvq013lg3t9726itf06e15v2c.apps.googleusercontent.com",
   guideWidthRatio: 0.94,
   guideAspectRatio: 3.35,
@@ -130,7 +131,7 @@ async function authenticateUser() {
   showAuthGate("Verificando sua conta Google cadastrada...");
   renderAuthStatus();
 
-  const cachedAuth = restoreAuthSession();
+  const cachedAuth = await restoreTrustedDeviceSession();
   if (cachedAuth) {
     applyAuthenticatedUser(cachedAuth);
     hideAuthGate();
@@ -153,8 +154,10 @@ async function authenticateUser() {
       email: String(authResult.email || "").toLowerCase(),
       name: authResult.name || "",
       expiresAt: getJwtExpirationMs(credential),
+      deviceToken: getOrCreateDeviceToken(),
+      trustedDeviceExpiresAt: authResult.trustedDeviceExpiresAt || "",
     });
-    persistAuthSession();
+    persistTrustedDeviceSession();
     hideAuthGate();
     renderAuthStatus();
     return true;
@@ -234,7 +237,7 @@ function requestGoogleCredential() {
       if (settled) {
         return;
       }
-      if (notification.isNotDisplayed?.() || notification.isSkippedMoment?.()) {
+      if (notification.isDismissedMoment?.()) {
         settled = true;
         window.clearTimeout(timeout);
         reject(new Error("Conta Google nao identificada automaticamente."));
@@ -245,40 +248,43 @@ function requestGoogleCredential() {
 
 function applyAuthenticatedUser(auth) {
   state.auth = {
-    token: auth.token,
+    token: auth.token || "",
     email: String(auth.email || "").toLowerCase(),
     name: auth.name || "",
     expiresAt: Number(auth.expiresAt || 0),
+    deviceToken: auth.deviceToken || "",
+    trustedDeviceExpiresAt: auth.trustedDeviceExpiresAt || "",
   };
-  state.authenticated = Boolean(state.auth.token && state.auth.email);
+  state.authenticated = Boolean((state.auth.token || state.auth.deviceToken) && state.auth.email);
 }
 
-function persistAuthSession() {
-  if (!state.auth?.token || !state.auth?.email) {
+function persistTrustedDeviceSession() {
+  if (!state.auth?.deviceToken || !state.auth?.email || !state.auth?.trustedDeviceExpiresAt) {
     return;
   }
 
   try {
-    sessionStorage.setItem(CONFIG.authSessionKey, JSON.stringify(state.auth));
+    localStorage.setItem(CONFIG.authSessionKey, JSON.stringify(state.auth));
   } catch (error) {
-    console.warn("Nao foi possivel salvar sessao Google:", error);
+    console.warn("Nao foi possivel salvar dispositivo confiavel:", error);
   }
 }
 
-function restoreAuthSession() {
+async function restoreTrustedDeviceSession() {
   try {
-    const saved = JSON.parse(sessionStorage.getItem(CONFIG.authSessionKey) || "null");
-    if (!saved?.token || !saved?.email) {
+    const saved = JSON.parse(localStorage.getItem(CONFIG.authSessionKey) || "null");
+    if (!saved?.deviceToken || !saved?.email || !saved?.trustedDeviceExpiresAt) {
       return null;
     }
 
-    if (Number(saved.expiresAt || 0) <= Date.now() + 120000) {
+    if (Date.parse(saved.trustedDeviceExpiresAt) <= Date.now() + 120000) {
       clearAuthSession();
       return null;
     }
 
-    return saved;
-  } catch {
+    return await validateTrustedDevice(saved);
+  } catch (error) {
+    console.warn("Dispositivo confiavel nao validado:", error);
     clearAuthSession();
     return null;
   }
@@ -286,7 +292,7 @@ function restoreAuthSession() {
 
 function clearAuthSession() {
   try {
-    sessionStorage.removeItem(CONFIG.authSessionKey);
+    localStorage.removeItem(CONFIG.authSessionKey);
   } catch {
     // Sessao indisponivel; sem impacto funcional.
   }
@@ -297,12 +303,14 @@ async function validateGoogleCredential(idToken) {
     throw new Error("URL do Apps Script nao configurada.");
   }
 
+  const deviceToken = getOrCreateDeviceToken();
   const response = await fetch(state.config.scriptUrl, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify({
       action: "auth",
       authToken: idToken,
+      deviceToken,
     }),
   });
   const result = await response.json();
@@ -312,6 +320,50 @@ async function validateGoogleCredential(idToken) {
   }
 
   return result;
+}
+
+async function validateTrustedDevice(savedAuth) {
+  if (!state.config.scriptUrl) {
+    throw new Error("URL do Apps Script nao configurada.");
+  }
+
+  const response = await fetch(state.config.scriptUrl, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({
+      action: "auth",
+      deviceToken: savedAuth.deviceToken,
+    }),
+  });
+  const result = await response.json();
+
+  if (!response.ok || result.ok !== true) {
+    throw new Error(result.message || "Dispositivo nao autorizado.");
+  }
+
+  return {
+    ...savedAuth,
+    email: String(result.email || savedAuth.email || "").toLowerCase(),
+    name: result.name || savedAuth.name || "",
+    token: "",
+  };
+}
+
+function getOrCreateDeviceToken() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(CONFIG.trustedDeviceKey) || "null");
+    if (saved?.deviceToken && /^[a-f0-9]{64}$/i.test(saved.deviceToken)) {
+      return saved.deviceToken.toLowerCase();
+    }
+  } catch {
+    // Recria abaixo.
+  }
+
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  const deviceToken = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  localStorage.setItem(CONFIG.trustedDeviceKey, JSON.stringify({ deviceToken, createdAt: new Date().toISOString() }));
+  return deviceToken;
 }
 
 function showAuthGate(message) {
@@ -353,11 +405,19 @@ function getJwtExpirationMs(token) {
 }
 
 function ensureAuthenticated() {
-  if (!state.authenticated || !state.auth?.token) {
+  if (!state.authenticated || (!state.auth?.token && !state.auth?.deviceToken)) {
     throw new Error("Você precisa estar logado em sua conta Google Cadastrada para entrar");
   }
 
-  if (state.auth.expiresAt && Date.now() > state.auth.expiresAt - 60000) {
+  if (state.auth.trustedDeviceExpiresAt && Date.parse(state.auth.trustedDeviceExpiresAt) <= Date.now() + 60000) {
+    state.authenticated = false;
+    clearAuthSession();
+    renderAuthStatus();
+    showAuthGate("Você precisa estar logado em sua conta Google Cadastrada para entrar");
+    throw new Error("Você precisa estar logado em sua conta Google Cadastrada para entrar");
+  }
+
+  if (!state.auth.deviceToken && state.auth.expiresAt && Date.now() > state.auth.expiresAt - 60000) {
     state.authenticated = false;
     clearAuthSession();
     renderAuthStatus();
@@ -370,15 +430,28 @@ function ensureAuthenticated() {
 
 function addAuthToUrl(url) {
   const auth = ensureAuthenticated();
-  url.searchParams.set("authToken", auth.token);
+  if (auth.token && (!auth.expiresAt || Date.now() <= auth.expiresAt - 60000)) {
+    url.searchParams.set("authToken", auth.token);
+  }
+  if (auth.deviceToken) {
+    url.searchParams.set("deviceToken", auth.deviceToken);
+  }
   return url;
 }
 
 function withAuthPayload(payload) {
   const auth = ensureAuthenticated();
+  const authFields = {};
+  if (auth.token && (!auth.expiresAt || Date.now() <= auth.expiresAt - 60000)) {
+    authFields.authToken = auth.token;
+  }
+  if (auth.deviceToken) {
+    authFields.deviceToken = auth.deviceToken;
+  }
+
   return {
     ...payload,
-    authToken: auth.token,
+    ...authFields,
     userEmail: auth.email,
   };
 }
