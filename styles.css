@@ -342,7 +342,7 @@ video {
 }
 
 .confirm-card {
-  width: min(520px, 100%);
+  width: min(620px, 100%);
   padding: 18px;
   border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: calc(var(--radius) + 4px);
@@ -355,13 +355,38 @@ video {
   color: var(--brand);
 }
 
+.confirm-title-alert {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 12px;
+  border: 1px solid rgba(185, 28, 28, 0.28);
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, #fff1f2 0%, #fff7ed 100%);
+  color: var(--danger) !important;
+  box-shadow: 0 10px 24px rgba(185, 28, 28, 0.1);
+}
+
+.confirm-title-alert::before {
+  content: "!";
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 950;
+}
+
 .confirm-summary dl {
   display: grid;
   gap: 8px;
   margin: 0;
 }
 
-.confirm-summary div {
+.confirm-summary dl > div {
   display: grid;
   grid-template-columns: 112px minmax(0, 1fr);
   gap: 10px;
@@ -382,6 +407,30 @@ video {
   margin: 0;
   font-weight: 850;
   overflow-wrap: anywhere;
+}
+
+.confirm-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 11px;
+}
+
+.confirm-edit-grid label {
+  margin: 0;
+}
+
+.confirm-edit-grid .full-width {
+  grid-column: 1 / -1;
+}
+
+.confirm-edit-feedback {
+  margin: 12px 0 0;
+  padding: 11px 12px;
+  border: 1px solid rgba(185, 28, 28, 0.32);
+  border-radius: var(--radius);
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-weight: 900;
 }
 
 .duplicate-warning {
@@ -597,13 +646,6 @@ textarea {
 
 .full-width {
   grid-column: 1 / -1;
-}
-
-.sticky-actions {
-  position: sticky;
-  bottom: 8px;
-  padding-top: 8px;
-  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.96) 32%);
 }
 
 .summary-tools {
@@ -850,9 +892,13 @@ textarea {
     flex: 1 1 100%;
   }
 
-  .confirm-summary div {
+  .confirm-summary dl > div {
     grid-template-columns: 1fr;
     gap: 3px;
+  }
+
+  .confirm-edit-grid {
+    grid-template-columns: 1fr;
   }
 
   .confirm-actions {

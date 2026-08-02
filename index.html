@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b3f3a">
   <title>ETIQUETAS SAHMT</title>
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./styles.css?v=29">
+  <link rel="stylesheet" href="./styles.css?v=30">
 </head>
 <body>
   <div class="app-shell">
@@ -136,11 +136,10 @@
           </label>
         </form>
 
-        <div class="actions sticky-actions">
+        <div class="actions">
           <button id="send-sheet" type="button">ENVIAR</button>
           <button id="clear-form" type="button" class="secondary">Limpar</button>
         </div>
-        <p class="send-note">Conferir os dados e corrigir antes de enviar</p>
         <p id="send-feedback" class="send-feedback" hidden></p>
       </section>
 
@@ -234,11 +233,11 @@
 
   <div id="confirm-overlay" class="confirm-overlay" hidden>
     <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
-      <h2 id="confirm-title">Conferir antes de enviar</h2>
+      <h2 id="confirm-title" class="confirm-title-alert">Conferir antes de enviar</h2>
       <div id="confirm-summary" class="confirm-summary"></div>
       <div class="confirm-actions">
         <button id="confirm-send" type="button">Confirmar envio</button>
-        <button id="cancel-send" type="button" class="secondary">Cancelar</button>
+        <button id="cancel-send" type="button" class="secondary">Corrigir dados</button>
       </div>
     </div>
   </div>
@@ -264,6 +263,6 @@
       }
     })();
   </script>
-  <script src="./app.js?v=29" type="module"></script>
+  <script src="./app.js?v=30" type="module"></script>
 </body>
 </html>

@@ -602,21 +602,10 @@ async function sendToSheet() {
     return;
   }
 
-  const payload = collectFormData();
-  const requiredFields = ["data", "nomePaciente", "cirurgia", "atendimento", "tipo", "credor"];
-  if (payload.credor !== CREDOR_CAIXA) {
-    requiredFields.push("plantonistas");
-  }
-
-  const missing = requiredFields.filter((key) => !payload[key]);
-  if (missing.length) {
-    showSendError("Preencha Data, Nome, Cirurgia, Atendimento, Tipo, Credor e Plantonista(s) quando necessario antes de enviar.");
-    return;
-  }
-
-  await loadSummary({ silent: true, date: payload.data });
+  let payload = collectFormData();
+  await loadSummary({ silent: true, date: payload.data || getTodayISO() });
   const duplicateRows = findExactDuplicates(payload);
-  const confirmation = await confirmSubmission(payload, duplicateRows);
+  const confirmation = await confirmSubmissionEditable(payload, duplicateRows);
   const confirmed = confirmation.confirmed;
   if (!confirmed) {
     setSendFeedback("Envio cancelado para conferencia.", "neutral");
@@ -625,8 +614,13 @@ async function sendToSheet() {
   }
 
   if (confirmation.duplicateJustification) {
+    payload = confirmation.payload;
+    applyConfirmationPayloadToForm(payload);
     payload.duplicateJustification = confirmation.duplicateJustification;
     payload.observacoes = `Duplicidade justificada: ${confirmation.duplicateJustification}`;
+  } else {
+    payload = confirmation.payload;
+    applyConfirmationPayloadToForm(payload);
   }
 
   toggleBusy(true);
@@ -767,6 +761,167 @@ function confirmSubmission(payload, duplicateRows = []) {
     confirmOverlayEl.addEventListener("click", onBackdrop);
     document.addEventListener("keydown", onKeydown);
   });
+}
+
+function confirmSubmissionEditable(payload, duplicateRows = []) {
+  if (!confirmOverlayEl || !confirmSummaryEl || !confirmSendEl || !cancelSendEl) {
+    return Promise.resolve({ confirmed: false, payload, duplicateJustification: "" });
+  }
+
+  let currentPayload = { ...payload };
+  let currentDuplicateRows = duplicateRows;
+
+  const renderConfirmationFields = (feedback = "") => {
+    const duplicateWarning = currentDuplicateRows.length ? `
+      <div class="duplicate-warning">
+        <strong>Atenção: possível lançamento duplicado.</strong>
+        <span>Já existe ${currentDuplicateRows.length} registro(s) com exatamente os mesmos dados nesta data. Justifique para continuar.</span>
+        <label>
+          <span>Justificativa da duplicidade</span>
+          <textarea id="duplicate-justification" rows="3" placeholder="Explique por que este lançamento deve ser repetido">${escapeHtml(currentPayload.duplicateJustification || "")}</textarea>
+        </label>
+      </div>
+    ` : "";
+
+    confirmSummaryEl.innerHTML = `
+      <div class="confirm-edit-grid">
+        <label>
+          <span>Data</span>
+          <input id="confirm-data" type="date" value="${escapeHtml(currentPayload.data || "")}" required>
+        </label>
+        <label class="full-width">
+          <span>Nome do Paciente</span>
+          <input id="confirm-nomePaciente" type="text" value="${escapeHtml(currentPayload.nomePaciente || "")}" required>
+        </label>
+        <label>
+          <span>Cirurgia</span>
+          <input id="confirm-cirurgia" inputmode="numeric" value="${escapeHtml(currentPayload.cirurgia || "")}" required>
+        </label>
+        <label>
+          <span>Atendimento</span>
+          <input id="confirm-atendimento" inputmode="numeric" value="${escapeHtml(currentPayload.atendimento || "")}" required>
+        </label>
+        <label>
+          <span>Tipo</span>
+          <select id="confirm-tipo" required>
+            ${renderOption("", "Selecione", currentPayload.tipo)}
+            ${renderOption("Particular", "Particular", currentPayload.tipo)}
+            ${renderOption("Complementação", "Complementação", currentPayload.tipo)}
+            ${renderOption("Unimed", "Unimed", currentPayload.tipo)}
+            ${renderOption("Outros", "Outros", currentPayload.tipo)}
+          </select>
+        </label>
+        <label>
+          <span>Credor</span>
+          <select id="confirm-credor" required>
+            ${renderOption("", "Selecione", currentPayload.credor)}
+            ${renderOption("Caixa", "Caixa", currentPayload.credor)}
+            ${renderOption("Plantão", "Plantão", currentPayload.credor)}
+            ${renderOption("Plantão/Caixa", "Plantão/Caixa", currentPayload.credor)}
+          </select>
+        </label>
+        <label class="full-width">
+          <span>Plantonista(s)</span>
+          <input id="confirm-plantonistas" type="text" value="${escapeHtml(currentPayload.plantonistas || "")}" placeholder="Nao necessario quando Credor for Caixa">
+        </label>
+      </div>
+      ${duplicateWarning}
+      <p id="confirm-edit-feedback" class="confirm-edit-feedback" ${feedback ? "" : "hidden"}>${escapeHtml(feedback)}</p>
+    `;
+  };
+
+  renderConfirmationFields();
+  confirmOverlayEl.hidden = false;
+  confirmSendEl.focus();
+
+  return new Promise((resolve) => {
+    const finish = (confirmed, finalPayload = currentPayload, duplicateJustification = "") => {
+      confirmOverlayEl.hidden = true;
+      confirmSendEl.removeEventListener("click", onConfirm);
+      cancelSendEl.removeEventListener("click", onCancel);
+      confirmOverlayEl.removeEventListener("click", onBackdrop);
+      document.removeEventListener("keydown", onKeydown);
+      resolve({ confirmed, payload: finalPayload, duplicateJustification });
+    };
+
+    const onConfirm = async () => {
+      currentPayload = collectConfirmationPayload(currentPayload);
+      const missing = getMissingRequiredFields(currentPayload);
+      if (missing.length) {
+        renderConfirmationFields("Corrija os campos obrigatórios antes de confirmar o envio.");
+        return;
+      }
+
+      await loadSummary({ silent: true, date: currentPayload.data });
+      currentDuplicateRows = findExactDuplicates(currentPayload);
+      const duplicateJustification = currentPayload.duplicateJustification || "";
+      if (currentDuplicateRows.length && !duplicateJustification) {
+        renderConfirmationFields("Informe a justificativa para enviar este lançamento duplicado.");
+        confirmSummaryEl.querySelector("#duplicate-justification")?.focus();
+        return;
+      }
+
+      finish(true, currentPayload, duplicateJustification);
+    };
+    const onCancel = () => finish(false);
+    const onBackdrop = (event) => {
+      if (event.target === confirmOverlayEl) {
+        finish(false);
+      }
+    };
+    const onKeydown = (event) => {
+      if (event.key === "Escape") {
+        finish(false);
+      }
+    };
+
+    confirmSendEl.addEventListener("click", onConfirm);
+    cancelSendEl.addEventListener("click", onCancel);
+    confirmOverlayEl.addEventListener("click", onBackdrop);
+    document.addEventListener("keydown", onKeydown);
+  });
+}
+
+function renderOption(value, label, selectedValue) {
+  const selected = String(value) === String(selectedValue || "") ? " selected" : "";
+  return `<option value="${escapeHtml(value)}"${selected}>${escapeHtml(label)}</option>`;
+}
+
+function collectConfirmationPayload(basePayload) {
+  const credor = confirmSummaryEl.querySelector("#confirm-credor")?.value.trim() || "";
+  const duplicateJustification = confirmSummaryEl.querySelector("#duplicate-justification")?.value.trim() || "";
+
+  return {
+    ...basePayload,
+    data: confirmSummaryEl.querySelector("#confirm-data")?.value || "",
+    nomePaciente: confirmSummaryEl.querySelector("#confirm-nomePaciente")?.value.trim() || "",
+    cirurgia: cleanDigits(confirmSummaryEl.querySelector("#confirm-cirurgia")?.value || ""),
+    atendimento: cleanDigits(confirmSummaryEl.querySelector("#confirm-atendimento")?.value || ""),
+    tipo: confirmSummaryEl.querySelector("#confirm-tipo")?.value.trim() || "",
+    credor,
+    plantonistas: credor === CREDOR_CAIXA ? "" : (confirmSummaryEl.querySelector("#confirm-plantonistas")?.value.trim() || ""),
+    duplicateJustification,
+  };
+}
+
+function getMissingRequiredFields(payload) {
+  const required = ["data", "nomePaciente", "cirurgia", "atendimento", "tipo", "credor"];
+  if (payload.credor !== CREDOR_CAIXA) {
+    required.push("plantonistas");
+  }
+
+  return required.filter((key) => !String(payload[key] || "").trim());
+}
+
+function applyConfirmationPayloadToForm(payload) {
+  fields.data.value = payload.data || fields.data.value;
+  fields.nomePaciente.value = payload.nomePaciente || "";
+  fields.cirurgia.value = payload.cirurgia || "";
+  fields.atendimento.value = payload.atendimento || "";
+  fields.tipo.value = payload.tipo || "";
+  fields.credor.value = payload.credor || "";
+  setSelectedPlantonistasFromValue(payload.plantonistas || "");
+  syncPlantonistasRequirement();
 }
 
 async function refreshDisplayedSummaries() {
@@ -1400,6 +1555,21 @@ function getSelectedPlantonistasValue() {
     .map((option) => option.value.trim())
     .filter(Boolean)
     .join(", ");
+}
+
+function setSelectedPlantonistasFromValue(value) {
+  const selected = String(value || "")
+    .split(/[,;]+/)
+    .map((item) => item.trim().toUpperCase())
+    .filter(Boolean);
+
+  plantonistasUi.checks.forEach((checkbox) => {
+    checkbox.checked = selected.includes(checkbox.value.toUpperCase());
+  });
+  Array.from(fields.plantonistas.options).forEach((option) => {
+    option.selected = selected.includes(option.value.toUpperCase());
+  });
+  syncPlantonistasFromCheckboxes();
 }
 
 function clearPlantonistasSelection() {
