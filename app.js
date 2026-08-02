@@ -42,6 +42,7 @@ const sheetStatusEl = document.querySelector("#sheet-status");
 const authGateEl = document.querySelector("#auth-gate");
 const authMessageEl = document.querySelector("#auth-message");
 const authUserEl = document.querySelector("#auth-user");
+const authGoogleButtonEl = document.querySelector("#auth-google");
 const scriptUrlEl = document.querySelector("#script-url");
 const formEl = document.querySelector("#label-form");
 const summaryDateEl = document.querySelector("#summary-date");
@@ -90,6 +91,7 @@ document.querySelector("#send-sheet").addEventListener("click", sendToSheet);
 document.querySelector("#clear-form").addEventListener("click", resetForm);
 document.querySelector("#save-settings").addEventListener("click", saveSettings);
 document.querySelector("#generate-month-pdf-whatsapp").addEventListener("click", generateMonthlyPdfForWhatsApp);
+authGoogleButtonEl?.addEventListener("click", authorizeDeviceWithGoogle);
 summaryDateEl.addEventListener("change", loadSummary);
 reportMonthEl.addEventListener("change", loadMonthlySummary);
 fields.credor.addEventListener("change", syncPlantonistasRequirement);
@@ -128,7 +130,7 @@ async function bootstrap() {
 }
 
 async function authenticateUser() {
-  showAuthGate("Verificando sua conta Google cadastrada...");
+  showAuthGate("Verificando se este dispositivo ja esta autorizado...", { showButton: false });
   renderAuthStatus();
 
   const cachedAuth = await restoreTrustedDeviceSession();
@@ -139,10 +141,21 @@ async function authenticateUser() {
     return true;
   }
 
+  state.auth = null;
+  state.authenticated = false;
+  renderAuthStatus();
+  showAuthGate("Dispositivo ainda nao autorizado. Toque abaixo uma vez para autorizar com sua conta Google cadastrada.", { showButton: true });
+  return false;
+}
+
+async function authorizeDeviceWithGoogle() {
   if (!CONFIG.googleClientId) {
-    showAuthGate("Você precisa estar logado em sua conta Google Cadastrada para entrar");
-    return false;
+    showAuthGate("Login Google indisponivel neste app.", { showButton: false });
+    return;
   }
+
+  authGoogleButtonEl.disabled = true;
+  showAuthGate("Abrindo autorizacao Google...", { showButton: true });
 
   try {
     await waitForGoogleIdentity();
@@ -160,15 +173,17 @@ async function authenticateUser() {
     persistTrustedDeviceSession();
     hideAuthGate();
     renderAuthStatus();
-    return true;
+    await initializeAuthorizedApp();
+    registerServiceWorker();
   } catch (error) {
-    console.warn("Falha na autenticacao Google:", error);
+    console.warn("Falha na autorizacao Google:", error);
     state.auth = null;
     state.authenticated = false;
     clearAuthSession();
     renderAuthStatus();
-    showAuthGate("Você precisa estar logado em sua conta Google Cadastrada para entrar");
-    return false;
+    showAuthGate("Nao foi possivel autorizar. Confira se o Chrome esta logado em uma conta Google cadastrada e tente novamente.", { showButton: true });
+  } finally {
+    authGoogleButtonEl.disabled = false;
   }
 }
 
@@ -218,7 +233,6 @@ function requestGoogleCredential() {
       auto_select: true,
       cancel_on_tap_outside: false,
       itp_support: true,
-      use_fedcm_for_prompt: true,
       callback(response) {
         if (settled) {
           return;
@@ -366,15 +380,21 @@ function getOrCreateDeviceToken() {
   return deviceToken;
 }
 
-function showAuthGate(message) {
+function showAuthGate(message, options = {}) {
   if (authMessageEl) {
     authMessageEl.textContent = message;
+  }
+  if (authGoogleButtonEl) {
+    authGoogleButtonEl.hidden = !options.showButton;
   }
   authGateEl?.removeAttribute("hidden");
   document.body.classList.add("auth-locked");
 }
 
 function hideAuthGate() {
+  if (authGoogleButtonEl) {
+    authGoogleButtonEl.hidden = true;
+  }
   authGateEl?.setAttribute("hidden", "");
   document.body.classList.remove("auth-locked");
 }

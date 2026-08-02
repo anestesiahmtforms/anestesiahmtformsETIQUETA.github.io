@@ -186,6 +186,11 @@ h2 {
   line-height: 1.45;
 }
 
+.auth-action {
+  width: 100%;
+  margin-top: 18px;
+}
+
 .camera-stage {
   position: relative;
   overflow: hidden;
