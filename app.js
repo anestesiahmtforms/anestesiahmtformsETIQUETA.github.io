@@ -5,6 +5,11 @@ const CONFIG = {
   defaultScriptUrl: "https://script.google.com/macros/s/AKfycbxBLda_QQYDfl5Y47kanACt0DSL-BFbhxmOenPL18fHWM6feU0H5xaEagsrwE6rdv546A/exec",
 };
 
+const LEGACY_SCRIPT_URLS = new Set([
+  "https://script.google.com/macros/s/AKfycbxyZIn0JO7eCrCOo5MdaCQkrUMuUwGB0HY_Z6j5FZ8xS5OEJ4ySQLNPaUoIz8nbbrKN/exec",
+  "https://script.google.com/macros/s/AKfycbzWwukthNK5OP2itdkJ9tNR-4TZg5IfoORA8q1ke0KpLkCkKklZQJyxEpiEH0mjY0gn0w/exec",
+]);
+
 const ALERT_TYPES = new Set(["particular", "complementacao", "complementação"]);
 const CREDOR_CAIXA = "Caixa";
 
@@ -79,7 +84,10 @@ async function bootstrap() {
 function loadConfig() {
   try {
     const saved = JSON.parse(localStorage.getItem(CONFIG.storageKey) || "{}");
-    return { scriptUrl: saved.scriptUrl || CONFIG.defaultScriptUrl };
+    const savedUrl = String(saved.scriptUrl || "").trim();
+    return {
+      scriptUrl: savedUrl && !LEGACY_SCRIPT_URLS.has(savedUrl) ? savedUrl : CONFIG.defaultScriptUrl,
+    };
   } catch {
     return { scriptUrl: CONFIG.defaultScriptUrl };
   }
