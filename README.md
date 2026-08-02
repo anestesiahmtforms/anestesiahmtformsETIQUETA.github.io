@@ -39,7 +39,7 @@ Planilha de destino:
 
 O Apps Script em `apps-script/Code.gs` cria e ajusta automaticamente:
 
-- aba `Registros`
+- aba `ETIQUETA`
 - aba `Listas`
 - cabecalhos
 - listas de validacao para `Tipo` e `Credor`
@@ -47,7 +47,7 @@ O Apps Script em `apps-script/Code.gs` cria e ajusta automaticamente:
 - endpoint de envio
 - endpoint de resumo por data e por mes
 
-Cabecalho esperado da aba `Registros`:
+Cabecalho esperado da aba `ETIQUETA`:
 
 ```text
 Data | Nome do Paciente | Cirurgia | Atendimento | Tipo | Credor | Plantonista(s) | Observacoes | Criado em
@@ -66,13 +66,13 @@ Data | Nome do Paciente | Cirurgia | Atendimento | Tipo | Credor | Plantonista(s
 9. Em `Executar como`, use `Voce`.
 10. Em acesso, escolha uma opcao que permita o uso do app.
 11. Copie a URL final `/exec`.
-12. URL configurada como padrao no PWA:
+12. Copie a URL final `/exec` e substitua em `app.js`, no campo `defaultScriptUrl`.
 
 ```text
-https://script.google.com/macros/s/AKfycbxBLda_QQYDfl5Y47kanACt0DSL-BFbhxmOenPL18fHWM6feU0H5xaEagsrwE6rdv546A/exec
+defaultScriptUrl: "COLE_A_URL_NOVA_DO_WEB_APP_AQUI"
 ```
 
-Se criar uma nova implantacao no futuro, cole a nova URL em `URL do Google Apps Script Web App` e salve.
+Nao reutilize URLs antigas que retornem as listas `Caixa TOTAL`, `50%:Caixa/Plantao:50%` ou `Plantao TOTAL`.
 
 ## Publicacao no GitHub Pages
 

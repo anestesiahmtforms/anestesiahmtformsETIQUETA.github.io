@@ -195,6 +195,23 @@
 
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
+  <script>
+    (() => {
+      const legacyUrls = new Set([
+        "https://script.google.com/macros/s/AKfycbxyZIn0JO7eCrCOo5MdaCQkrUMuUwGB0HY_Z6j5FZ8xS5OEJ4ySQLNPaUoIz8nbbrKN/exec",
+        "https://script.google.com/macros/s/AKfycbzWwukthNK5OP2itdkJ9tNR-4TZg5IfoORA8q1ke0KpLkCkKklZQJyxEpiEH0mjY0gn0w/exec",
+      ]);
+      try {
+        const key = "etiqueta-hmt-ia-v1";
+        const saved = JSON.parse(localStorage.getItem(key) || "{}");
+        if (legacyUrls.has(String(saved.scriptUrl || "").trim())) {
+          localStorage.removeItem(key);
+        }
+      } catch {
+        localStorage.removeItem("etiqueta-hmt-ia-v1");
+      }
+    })();
+  </script>
   <script src="./app.js" type="module"></script>
 </body>
 </html>
