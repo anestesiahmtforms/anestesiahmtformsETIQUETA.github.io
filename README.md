@@ -69,7 +69,7 @@ Data | Nome do Paciente | Cirurgia | Atendimento | Tipo | Credor | Plantonista(s
 12. URL configurada como padrao no PWA:
 
 ```text
-https://script.google.com/macros/s/AKfycbxyZIn0JO7eCrCOo5MdaCQkrUMuUwGB0HY_Z6j5FZ8xS5OEJ4ySQLNPaUoIz8nbbrKN/exec
+https://script.google.com/macros/s/AKfycbxBLda_QQYDfl5Y47kanACt0DSL-BFbhxmOenPL18fHWM6feU0H5xaEagsrwE6rdv546A/exec
 ```
 
 Se criar uma nova implantacao no futuro, cole a nova URL em `URL do Google Apps Script Web App` e salve.

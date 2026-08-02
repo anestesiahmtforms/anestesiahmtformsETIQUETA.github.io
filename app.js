@@ -2,7 +2,7 @@ const CONFIG = {
   storageKey: "etiqueta-hmt-ia-v1",
   guideWidthRatio: 0.94,
   guideAspectRatio: 3.35,
-  defaultScriptUrl: "https://script.google.com/macros/s/AKfycbxyZIn0JO7eCrCOo5MdaCQkrUMuUwGB0HY_Z6j5FZ8xS5OEJ4ySQLNPaUoIz8nbbrKN/exec",
+  defaultScriptUrl: "https://script.google.com/macros/s/AKfycbxBLda_QQYDfl5Y47kanACt0DSL-BFbhxmOenPL18fHWM6feU0H5xaEagsrwE6rdv546A/exec",
 };
 
 const ALERT_TYPES = new Set(["particular", "complementacao", "complementação"]);
