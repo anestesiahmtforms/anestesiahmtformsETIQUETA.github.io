@@ -69,7 +69,7 @@ Data | Nome do Paciente | Cirurgia | Atendimento | Tipo | Credor | Plantonista(s
 12. Copie a URL final `/exec` e substitua em `app.js`, no campo `defaultScriptUrl`.
 
 ```text
-defaultScriptUrl: "COLE_A_URL_NOVA_DO_WEB_APP_AQUI"
+defaultScriptUrl: "https://script.google.com/macros/s/AKfycbzTb2EQ8iM-oB5KnxI26uBvG_ddjDLCD7G0YBov9mgLe7apX89vBECecaUnOHyRTwED/exec"
 ```
 
 Nao reutilize URLs antigas que retornem as listas `Caixa TOTAL`, `50%:Caixa/Plantao:50%` ou `Plantao TOTAL`.
