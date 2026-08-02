@@ -1,6 +1,6 @@
-# ETIQUETAS HMT
+# ETIQUETAS SAHMT
 
-PWA para smartphone Android/iOS para leitura de etiquetas HMT com IA.
+PWA para smartphone Android/iOS para leitura de etiquetas SAHMT com IA.
 
 ## Leitura da etiqueta
 
@@ -77,6 +77,10 @@ Cabecalho esperado da aba `ETIQUETA`:
 ```text
 Data | Nome do Paciente | Cirurgia | Atendimento | Tipo | Credor | Plantonista(s) | Observacoes | Criado em | Criado por | Observacao atualizada em | Observacao atualizada por
 ```
+
+A coluna `Data` deve aparecer no padrao `dd/mm/aaaa`. As colunas `Criado em` e `Observacao atualizada em` usam `dd/mm/aaaa hh:mm:ss`.
+
+Quando houver outro lancamento exatamente igual na mesma data, o app alerta antes do envio e exige justificativa. A justificativa fica registrada em `Observacoes`.
 
 ## Como ativar a IA
 

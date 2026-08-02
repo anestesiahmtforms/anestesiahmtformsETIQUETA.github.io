@@ -384,6 +384,34 @@ video {
   overflow-wrap: anywhere;
 }
 
+.duplicate-warning {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 13px;
+  border: 1px solid rgba(185, 28, 28, 0.36);
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, #fff1f2 0%, #fff7ed 100%);
+  color: var(--danger);
+}
+
+.duplicate-warning strong {
+  font-size: 0.98rem;
+}
+
+.duplicate-warning span {
+  color: #7f1d1d;
+  font-weight: 750;
+}
+
+.duplicate-warning label span {
+  color: var(--danger);
+}
+
+.duplicate-warning small {
+  font-weight: 900;
+}
+
 .confirm-actions {
   display: flex;
   gap: 10px;

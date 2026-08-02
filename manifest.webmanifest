@@ -1,7 +1,7 @@
 {
-  "name": "ETIQUETAS HMT",
-  "short_name": "Etiquetas HMT",
-  "description": "PWA para ler Nome do Paciente e Registro em etiquetas HMT, registrar credor e gerar resumo em PDF.",
+  "name": "ETIQUETAS SAHMT",
+  "short_name": "Etiquetas SAHMT",
+  "description": "PWA para ler Nome do Paciente, Cirurgia e Atendimento em etiquetas SAHMT, registrar credor e gerar resumo em PDF.",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#eef2ec",

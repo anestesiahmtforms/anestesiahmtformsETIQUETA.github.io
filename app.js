@@ -614,11 +614,19 @@ async function sendToSheet() {
     return;
   }
 
-  const confirmed = await confirmSubmission(payload);
+  await loadSummary({ silent: true, date: payload.data });
+  const duplicateRows = findExactDuplicates(payload);
+  const confirmation = await confirmSubmission(payload, duplicateRows);
+  const confirmed = confirmation.confirmed;
   if (!confirmed) {
     setSendFeedback("Envio cancelado para conferencia.", "neutral");
     setStatus("Envio cancelado para conferencia.", "info");
     return;
+  }
+
+  if (confirmation.duplicateJustification) {
+    payload.duplicateJustification = confirmation.duplicateJustification;
+    payload.observacoes = `Duplicidade justificada: ${confirmation.duplicateJustification}`;
   }
 
   toggleBusy(true);
@@ -669,10 +677,34 @@ function setSendFeedback(message, tone = "neutral") {
   sendFeedbackEl.hidden = !message;
 }
 
-function confirmSubmission(payload) {
+function findExactDuplicates(payload) {
+  return state.summaryRows.filter((row) =>
+    normalizeDateKey(row.data) === normalizeDateKey(payload.data) &&
+    normalizeCompare(row.nomePaciente) === normalizeCompare(payload.nomePaciente) &&
+    cleanDigits(row.cirurgia) === cleanDigits(payload.cirurgia) &&
+    cleanDigits(row.atendimento) === cleanDigits(payload.atendimento) &&
+    normalizeCompare(row.tipo) === normalizeCompare(payload.tipo) &&
+    normalizeCompare(row.credor) === normalizeCompare(payload.credor) &&
+    normalizeCompare(row.plantonistas || "") === normalizeCompare(payload.plantonistas || "")
+  );
+}
+
+function confirmSubmission(payload, duplicateRows = []) {
   if (!confirmOverlayEl || !confirmSummaryEl || !confirmSendEl || !cancelSendEl) {
-    return Promise.resolve(false);
+    return Promise.resolve({ confirmed: false, duplicateJustification: "" });
   }
+
+  const duplicateWarning = duplicateRows.length ? `
+    <div class="duplicate-warning">
+      <strong>Atenção: possível lançamento duplicado.</strong>
+      <span>Já existe ${duplicateRows.length} registro(s) com exatamente os mesmos dados nesta data. Justifique para continuar.</span>
+      <label>
+        <span>Justificativa da duplicidade</span>
+        <textarea id="duplicate-justification" rows="3" placeholder="Explique por que este lançamento deve ser repetido"></textarea>
+      </label>
+      <small id="duplicate-warning-feedback" hidden>Informe a justificativa para enviar este lançamento duplicado.</small>
+    </div>
+  ` : "";
 
   confirmSummaryEl.innerHTML = `
     <dl>
@@ -684,22 +716,40 @@ function confirmSubmission(payload) {
       <div><dt>Credor</dt><dd>${escapeHtml(payload.credor)}</dd></div>
       <div><dt>Plantonista(s)</dt><dd>${escapeHtml(payload.plantonistas || "Nao necessario")}</dd></div>
     </dl>
+    ${duplicateWarning}
   `;
 
   confirmOverlayEl.hidden = false;
   confirmSendEl.focus();
 
   return new Promise((resolve) => {
-    const finish = (confirmed) => {
+    const finish = (confirmed, duplicateJustification = "") => {
       confirmOverlayEl.hidden = true;
       confirmSendEl.removeEventListener("click", onConfirm);
       cancelSendEl.removeEventListener("click", onCancel);
       confirmOverlayEl.removeEventListener("click", onBackdrop);
       document.removeEventListener("keydown", onKeydown);
-      resolve(confirmed);
+      resolve({ confirmed, duplicateJustification });
     };
 
-    const onConfirm = () => finish(true);
+    const onConfirm = () => {
+      if (duplicateRows.length) {
+        const justificationEl = confirmSummaryEl.querySelector("#duplicate-justification");
+        const feedbackEl = confirmSummaryEl.querySelector("#duplicate-warning-feedback");
+        const justification = justificationEl?.value.trim() || "";
+        if (!justification) {
+          if (feedbackEl) {
+            feedbackEl.hidden = false;
+          }
+          justificationEl?.focus();
+          return;
+        }
+        finish(true, justification);
+        return;
+      }
+
+      finish(true);
+    };
     const onCancel = () => finish(false);
     const onBackdrop = (event) => {
       if (event.target === confirmOverlayEl) {
@@ -743,7 +793,7 @@ async function loadSummary(options = {}) {
   try {
     const url = new URL(state.config.scriptUrl);
     url.searchParams.set("action", "summary");
-    url.searchParams.set("date", summaryDateEl.value || getTodayISO());
+    url.searchParams.set("date", options.date || summaryDateEl.value || getTodayISO());
     addAuthToUrl(url);
     const response = await fetch(url.toString(), { method: "GET" });
     const result = await response.json();
@@ -1026,7 +1076,7 @@ function generatePdfReport() {
 
   const date = summaryDateEl.value || getTodayISO();
   const doc = new jsPdf({ orientation: "landscape", unit: "mm", format: "a4" });
-  const title = `ETIQUETAS HMT - ${formatDate(date)}`;
+  const title = `ETIQUETAS SAHMT - ${formatDate(date)}`;
   const rows = state.summaryRows.map((row, index) => [
     String(index + 1),
     row.nomePaciente || "",
@@ -1075,11 +1125,12 @@ function generatePdfReport() {
     },
   });
 
-  doc.save(`etiquetas-hmt-${date}.pdf`);
+  doc.save(`etiquetas-sahmt-${date}.pdf`);
 }
 
 async function generateMonthlyPdfForWhatsApp() {
   const month = reportMonthEl.value || getTodayISO().slice(0, 7);
+  const preOpenedWhatsApp = window.open("about:blank", "_blank");
   toggleBusy(true);
   setStatus("Gerando relatorio mensal em PDF...", "info");
 
@@ -1089,28 +1140,19 @@ async function generateMonthlyPdfForWhatsApp() {
     const alertCount = rows.filter((row) => isAlertType(row.tipo)).length;
     renderMonthlyStatus(`${rows.length} entrada(s) em ${formatMonth(month)}. ${alertCount} alerta(s).`, rows.length ? "success" : "neutral");
     if (!rows.length) {
+      preOpenedWhatsApp?.close?.();
       setStatus("Nenhuma entrada encontrada para o mes selecionado.", "error");
       return;
     }
 
     const { blob, fileName, summaryText } = buildMonthlyPdf(rows, month);
-    const file = new File([blob], fileName, { type: "application/pdf" });
-
-    if (navigator.canShare?.({ files: [file] }) && navigator.share) {
-      await navigator.share({
-        files: [file],
-        title: `ETIQUETAS HMT - ${formatMonth(month)}`,
-        text: summaryText,
-      });
-      setStatus("Relatorio mensal pronto para envio pelo WhatsApp.", "success");
-      return;
-    }
 
     downloadBlob(blob, fileName);
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(summaryText + "\n\nPDF gerado e baixado no aparelho. Anexe o arquivo baixado nesta conversa.")}`;
-    window.open(whatsappUrl, "_blank", "noopener");
+    openWhatsAppUrl(whatsappUrl, preOpenedWhatsApp);
     setStatus("PDF baixado. O WhatsApp foi aberto com a mensagem do relatorio.", "success");
   } catch (error) {
+    preOpenedWhatsApp?.close?.();
     setStatus(`Falha ao gerar relatorio mensal: ${error.message}`, "error");
   } finally {
     toggleBusy(false);
@@ -1124,7 +1166,7 @@ function buildMonthlyPdf(rows, month) {
   }
 
   const doc = new jsPdf({ orientation: "landscape", unit: "mm", format: "a4" });
-  const title = `ETIQUETAS HMT - RELATORIO MENSAL - ${formatMonth(month)}`;
+  const title = `ETIQUETAS SAHMT - RELATORIO MENSAL - ${formatMonth(month)}`;
   const alertCount = rows.filter((row) => isAlertType(row.tipo)).length;
   const tableRows = rows.map((row, index) => [
     String(index + 1),
@@ -1176,12 +1218,24 @@ function buildMonthlyPdf(rows, month) {
     },
   });
 
-  const fileName = `etiquetas-hmt-${month}.pdf`;
+  const fileName = `etiquetas-sahmt-${month}.pdf`;
   return {
     blob: doc.output("blob"),
     fileName,
-    summaryText: `ETIQUETAS HMT - ${formatMonth(month)}\n${rows.length} entrada(s)\n${alertCount} alerta(s): Particular/Complementação`,
+    summaryText: `ETIQUETAS SAHMT - ${formatMonth(month)}\n${rows.length} entrada(s)\n${alertCount} alerta(s): Particular/Complementação`,
   };
+}
+
+function openWhatsAppUrl(url, preOpenedWindow) {
+  if (preOpenedWindow && !preOpenedWindow.closed) {
+    preOpenedWindow.location.href = url;
+    return;
+  }
+
+  const opened = window.open(url, "_blank", "noopener");
+  if (!opened) {
+    window.location.href = url;
+  }
 }
 
 function downloadBlob(blob, fileName) {
@@ -1389,6 +1443,16 @@ function formatDate(value) {
   return `${day}/${month}/${year}`;
 }
 
+function normalizeDateKey(value) {
+  const text = String(value || "").trim();
+  const brMatch = text.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (brMatch) {
+    return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
+  }
+
+  return text;
+}
+
 function formatMonth(value) {
   if (!value) {
     return "";
@@ -1412,6 +1476,10 @@ function normalizeSearch(value) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .trim();
+}
+
+function normalizeCompare(value) {
+  return normalizeSearch(value).replace(/\s+/g, " ");
 }
 
 function clamp(value, min, max) {

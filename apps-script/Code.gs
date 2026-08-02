@@ -2,7 +2,7 @@ const SPREADSHEET_NAME = "Etiquetas";
 const SPREADSHEET_ID = "1uvnn00jJOiE2KweCQ6IEFm8xN4kuuBIBs6VVYorkOtY";
 const REGISTROS_SHEET = "ETIQUETA";
 const LISTAS_SHEET = "Listas";
-const OPENAI_MODEL = "gpt-5.6";
+const OPENAI_MODEL = "gpt-5.2";
 const OPENAI_API_KEY_PROPERTY = "OPENAI_API_KEY";
 const GOOGLE_CLIENT_ID = "908976987584-o59p0obmvq013lg3t9726itf06e15v2c.apps.googleusercontent.com";
 const AUTH_REQUIRED_MESSAGE = "Você precisa estar logado em sua conta Google Cadastrada para entrar";
@@ -130,7 +130,7 @@ function doGet(e) {
 
     return jsonResponse({
       ok: true,
-      message: "ETIQUETAS HMT API online.",
+      message: "ETIQUETAS SAHMT API online.",
       spreadsheetName: spreadsheet.getName(),
       userEmail: user.email,
     });
@@ -153,6 +153,10 @@ function doPost(e) {
 
     const user = requireAuthorized_(payload.authToken || (e.parameter && e.parameter.authToken));
 
+    if (action === "aiHealth") {
+      return handleAiHealth_(user);
+    }
+
     if (action === "aiExtract") {
       return handleAiExtract_(payload);
     }
@@ -165,21 +169,27 @@ function doPost(e) {
 
     validatePayload_(payload);
 
+    const duplicateRows = findExactDuplicates_(payload);
+    if (duplicateRows.length && !String(payload.duplicateJustification || "").trim()) {
+      throw new Error("Lancamento duplicado encontrado. Informe uma justificativa para continuar.");
+    }
+
     const sheet = getSpreadsheet_().getSheetByName(REGISTROS_SHEET);
     sheet.appendRow([
-      payload.data || "",
+      parseIsoDate_(payload.data) || payload.data || "",
       payload.nomePaciente || "",
       payload.cirurgia || "",
       payload.atendimento || "",
       payload.tipo || "",
       payload.credor || "",
       payload.plantonistas || "",
-      payload.observacoes || "",
+      buildObservacoes_(payload),
       new Date(),
       user.email,
       "",
       "",
     ]);
+    applyRowFormats_(sheet, sheet.getLastRow());
 
     return jsonResponse({
       ok: true,
@@ -201,6 +211,32 @@ function handleAuth_(payload) {
     ok: true,
     email: user.email,
     name: user.name,
+  });
+}
+
+function handleAiHealth_(user) {
+  const apiKey = PropertiesService.getScriptProperties().getProperty(OPENAI_API_KEY_PROPERTY);
+  if (!apiKey) {
+    throw new Error("Configure a propriedade OPENAI_API_KEY no Apps Script.");
+  }
+
+  const response = UrlFetchApp.fetch("https://api.openai.com/v1/models/" + encodeURIComponent(OPENAI_MODEL), {
+    method: "get",
+    headers: {
+      Authorization: "Bearer " + apiKey,
+    },
+    muteHttpExceptions: true,
+  });
+  const status = response.getResponseCode();
+  if (status < 200 || status >= 300) {
+    throw new Error("API OpenAI nao confirmou o modelo " + OPENAI_MODEL + " (" + status + ").");
+  }
+
+  return jsonResponse({
+    ok: true,
+    model: OPENAI_MODEL,
+    userEmail: user.email,
+    message: "API OpenAI ativa.",
   });
 }
 
@@ -417,7 +453,20 @@ function formatRegistros_(sheet) {
     .setBackground("#0b3f3a")
     .setFontColor("#ffffff")
     .setFontWeight("bold");
+  sheet.getRange(2, 1, Math.max(sheet.getMaxRows() - 1, 1), 1).setNumberFormat("dd/mm/yyyy");
+  sheet.getRange(2, 9, Math.max(sheet.getMaxRows() - 1, 1), 1).setNumberFormat("dd/mm/yyyy hh:mm:ss");
+  sheet.getRange(2, 11, Math.max(sheet.getMaxRows() - 1, 1), 1).setNumberFormat("dd/mm/yyyy hh:mm:ss");
   sheet.autoResizeColumns(1, REGISTROS_HEADERS.length);
+}
+
+function applyRowFormats_(sheet, rowNumber) {
+  if (rowNumber < 2) {
+    return;
+  }
+
+  sheet.getRange(rowNumber, 1).setNumberFormat("dd/mm/yyyy");
+  sheet.getRange(rowNumber, 9).setNumberFormat("dd/mm/yyyy hh:mm:ss");
+  sheet.getRange(rowNumber, 11).setNumberFormat("dd/mm/yyyy hh:mm:ss");
 }
 
 function validatePayload_(payload) {
@@ -449,12 +498,35 @@ function handleUpdateObservation_(payload, user) {
   sheet.getRange(rowNumber, observacoesColumn).setValue(String(payload.observacoes || "").trim());
   sheet.getRange(rowNumber, observacaoAtualizadaEmColumn).setValue(new Date());
   sheet.getRange(rowNumber, observacaoAtualizadaPorColumn).setValue(user.email);
+  applyRowFormats_(sheet, rowNumber);
 
   return jsonResponse({
     ok: true,
     message: "Observacao atualizada com sucesso.",
     userEmail: user.email,
     entry: rowToEntry_(sheet.getRange(rowNumber, 1, 1, REGISTROS_HEADERS.length).getDisplayValues()[0], rowNumber),
+  });
+}
+
+function buildObservacoes_(payload) {
+  const observacoes = String(payload.observacoes || "").trim();
+  const duplicateJustification = String(payload.duplicateJustification || "").trim();
+  if (duplicateJustification && observacoes.indexOf("Duplicidade justificada:") === -1) {
+    return "Duplicidade justificada: " + duplicateJustification;
+  }
+
+  return observacoes;
+}
+
+function findExactDuplicates_(payload) {
+  const date = normalizeDate_(payload.data);
+  return getEntriesByDate_(date).filter(function(entry) {
+    return normalizeCompare_(entry.nomePaciente) === normalizeCompare_(payload.nomePaciente) &&
+      cleanDigits_(entry.cirurgia) === cleanDigits_(payload.cirurgia) &&
+      cleanDigits_(entry.atendimento) === cleanDigits_(payload.atendimento) &&
+      normalizeCompare_(entry.tipo) === normalizeCompare_(payload.tipo) &&
+      normalizeCompare_(entry.credor) === normalizeCompare_(payload.credor) &&
+      normalizeCompare_(entry.plantonistas || "") === normalizeCompare_(payload.plantonistas || "");
   });
 }
 
@@ -527,6 +599,24 @@ function normalizeDate_(value) {
   }
 
   return text;
+}
+
+function parseIsoDate_(value) {
+  const match = String(value || "").trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return null;
+  }
+
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+}
+
+function normalizeCompare_(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function cleanDigits_(value) {
