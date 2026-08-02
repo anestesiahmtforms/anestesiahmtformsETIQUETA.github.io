@@ -17,8 +17,8 @@ const REGISTROS_HEADERS = [
   "Criado em",
 ];
 
-const TIPO_OPTIONS = ["Particular", "Complementacao", "Unimed", "Outros"];
-const CREDOR_OPTIONS = ["Caixa TOTAL", "50%:Caixa/Plantao:50%", "Plantao TOTAL"];
+const TIPO_OPTIONS = ["Particular", "Complementação", "Unimed", "Outros"];
+const CREDOR_OPTIONS = ["Caixa", "Plantão", "Plantão/Caixa"];
 const PLANTONISTA_OPTIONS = [
   "AD", "AA", "AL", "BA", "CH", "CR", "DE", "DN", "FL", "FR", "GU", "GB", "IG", "JA",
   "L2", "LE", "LD", "LC", "LH", "LU", "LA", "LO", "MA", "MH", "PR", "RA", "RL", "RC",
@@ -280,7 +280,7 @@ function formatRegistros_(sheet) {
 
 function validatePayload_(payload) {
   const required = ["data", "nomePaciente", "cirurgia", "atendimento", "tipo", "credor"];
-  if (payload.credor !== "Caixa TOTAL") {
+  if (payload.credor !== "Caixa") {
     required.push("plantonistas");
   }
 

@@ -24,9 +24,9 @@ Atendimento: 7525561
 - `Nome do Paciente`, preenchido pela IA e editavel.
 - `Cirurgia`, preenchida pela IA e editavel.
 - `Atendimento`, preenchido pela IA e editavel.
-- `Tipo`: `Particular`, `Complementacao`, `Unimed`, `Outros`.
-- `Credor`: `Caixa TOTAL`, `50%:Caixa/Plantao:50%`, `Plantao TOTAL`.
-- `Plantonista(s)`: caixa de selecao multipla. Quando `Credor` for `Caixa TOTAL`, o campo fica desativado.
+- `Tipo`: `Particular`, `Complementação`, `Unimed`, `Outros`.
+- `Credor`: `Caixa`, `Plantão`, `Plantão/Caixa`.
+- `Plantonista(s)`: caixa de selecao multipla. Quando `Credor` for `Caixa`, o campo fica desativado.
 - `Observacoes`, opcional.
 
 Antes do envio, o app mostra uma confirmacao para conferencia dos dados.

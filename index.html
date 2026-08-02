@@ -93,9 +93,9 @@
             <span>Credor</span>
             <select id="credor" name="credor" required>
               <option value="">Selecione</option>
-              <option>Caixa TOTAL</option>
-              <option>50%:Caixa/Plantão:50%</option>
-              <option>Plantão TOTAL</option>
+              <option>Caixa</option>
+              <option>Plantão</option>
+              <option>Plantão/Caixa</option>
             </select>
           </label>
 
@@ -153,16 +153,8 @@
           <h2>Resumo do dia</h2>
         </div>
 
-        <div class="summary-tools">
-          <label>
-            <span>Buscar data</span>
-            <input id="summary-date" type="date">
-          </label>
-          <button id="load-summary" type="button" class="secondary">Buscar resumo</button>
-          <button id="generate-pdf" type="button">Relatorio PDF</button>
-        </div>
-
-        <div id="summary-totals" class="summary-totals"></div>
+        <input id="summary-date" type="date" hidden>
+        <div id="summary-totals" class="summary-totals" hidden></div>
         <div id="summary-list" class="summary-list">
           <p class="empty-state">Nenhum resumo carregado ainda.</p>
         </div>
@@ -184,7 +176,7 @@
         <p class="hint">Gera uma tabela mensal em PDF. Em celulares compativeis, o compartilhamento abre o WhatsApp pela tela de envio.</p>
       </section>
 
-      <section class="panel settings-panel">
+      <section class="panel settings-panel" hidden>
         <div class="section-title">
           <h2>Integracao</h2>
         </div>

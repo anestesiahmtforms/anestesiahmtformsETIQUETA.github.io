@@ -6,7 +6,7 @@ const CONFIG = {
 };
 
 const ALERT_TYPES = new Set(["particular", "complementacao", "complementação"]);
-const CAIXA_TOTAL = "Caixa TOTAL";
+const CREDOR_CAIXA = "Caixa";
 
 const state = {
   stream: null,
@@ -55,8 +55,6 @@ document.querySelector("#process-image").addEventListener("click", processCurren
 document.querySelector("#send-sheet").addEventListener("click", sendToSheet);
 document.querySelector("#clear-form").addEventListener("click", resetForm);
 document.querySelector("#save-settings").addEventListener("click", saveSettings);
-document.querySelector("#load-summary").addEventListener("click", loadSummary);
-document.querySelector("#generate-pdf").addEventListener("click", generatePdfReport);
 document.querySelector("#generate-month-pdf-whatsapp").addEventListener("click", generateMonthlyPdfForWhatsApp);
 summaryDateEl.addEventListener("change", loadSummary);
 fields.credor.addEventListener("change", syncPlantonistasRequirement);
@@ -335,7 +333,7 @@ function applyDataToForm(data) {
 }
 
 function collectFormData() {
-  const isCaixaTotal = fields.credor.value.trim() === CAIXA_TOTAL;
+  const isCaixa = fields.credor.value.trim() === CREDOR_CAIXA;
   return {
     data: fields.data.value,
     nomePaciente: fields.nomePaciente.value.trim(),
@@ -343,7 +341,7 @@ function collectFormData() {
     atendimento: fields.atendimento.value.trim(),
     tipo: fields.tipo.value.trim(),
     credor: fields.credor.value.trim(),
-    plantonistas: isCaixaTotal ? "" : getSelectedPlantonistasValue(),
+    plantonistas: isCaixa ? "" : getSelectedPlantonistasValue(),
     observacoes: fields.observacoes.value.trim(),
     userAgent: navigator.userAgent,
   };
@@ -357,7 +355,7 @@ async function sendToSheet() {
 
   const payload = collectFormData();
   const requiredFields = ["data", "nomePaciente", "cirurgia", "atendimento", "tipo", "credor"];
-  if (payload.credor !== CAIXA_TOTAL) {
+  if (payload.credor !== CREDOR_CAIXA) {
     requiredFields.push("plantonistas");
   }
 
@@ -446,11 +444,7 @@ async function loadSummary(options = {}) {
 }
 
 function renderSummary(rows, emptyMessage = "Nenhuma entrada encontrada nesta data.") {
-  const alertCount = rows.filter((row) => isAlertType(row.tipo)).length;
-  summaryTotalsEl.innerHTML = `
-    <span>${rows.length} entrada(s)</span>
-    <span>${alertCount} alerta(s)</span>
-  `;
+  summaryTotalsEl.innerHTML = "";
 
   if (!rows.length) {
     summaryListEl.innerHTML = `<p class="empty-state">${escapeHtml(emptyMessage)}</p>`;
@@ -662,7 +656,7 @@ function buildMonthlyPdf(rows, month) {
   return {
     blob: doc.output("blob"),
     fileName,
-    summaryText: `ETIQUETAS HMT - ${formatMonth(month)}\n${rows.length} entrada(s)\n${alertCount} alerta(s): Particular/Complementacao`,
+    summaryText: `ETIQUETAS HMT - ${formatMonth(month)}\n${rows.length} entrada(s)\n${alertCount} alerta(s): Particular/Complementação`,
   };
 }
 
@@ -722,23 +716,28 @@ function toggleBusy(isBusy) {
 }
 
 function isAlertType(value) {
-  return ALERT_TYPES.has(String(value || "").trim().toLowerCase());
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return normalized === "particular" || normalized === "complementacao";
 }
 
 function syncPlantonistasRequirement() {
-  const isCaixaTotal = fields.credor.value.trim() === CAIXA_TOTAL;
-  fields.plantonistas.disabled = isCaixaTotal;
-  fields.plantonistas.required = !isCaixaTotal;
+  const isCaixa = fields.credor.value.trim() === CREDOR_CAIXA;
+  fields.plantonistas.disabled = isCaixa;
+  fields.plantonistas.required = !isCaixa;
 
   if (plantonistasUi.button) {
-    plantonistasUi.button.disabled = isCaixaTotal;
+    plantonistasUi.button.disabled = isCaixa;
   }
 
   plantonistasUi.checks.forEach((checkbox) => {
-    checkbox.disabled = isCaixaTotal;
+    checkbox.disabled = isCaixa;
   });
 
-  if (isCaixaTotal) {
+  if (isCaixa) {
     clearPlantonistasSelection();
     closePlantonistasPicker();
   }
