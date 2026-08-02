@@ -422,8 +422,8 @@ async function sendToSheet() {
     reportMonthEl.value = sentDate.slice(0, 7);
     await loadSummary({ silent: true });
     await loadMonthlySummary({ silent: true });
-    setSendFeedback("Dados enviados com sucesso para a planilha.", "success");
-    setStatus("Dados enviados com sucesso para a planilha.", "success");
+    setSendFeedback("Dados enviados com sucesso!", "success");
+    setStatus("Dados enviados com sucesso!", "success");
   } catch (error) {
     showSendError(`Falha ao enviar para a planilha: ${error.message}`);
   } finally {
