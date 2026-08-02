@@ -254,6 +254,71 @@ video {
   color: var(--danger);
 }
 
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(16, 32, 29, 0.62);
+  backdrop-filter: blur(8px);
+}
+
+.confirm-overlay[hidden] {
+  display: none;
+}
+
+.confirm-card {
+  width: min(520px, 100%);
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: calc(var(--radius) + 4px);
+  background: white;
+  box-shadow: 0 24px 70px rgba(12, 35, 31, 0.28);
+}
+
+.confirm-card h2 {
+  margin-bottom: 12px;
+  color: var(--brand);
+}
+
+.confirm-summary dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.confirm-summary div {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+}
+
+.confirm-summary dt {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.confirm-summary dd {
+  min-width: 0;
+  margin: 0;
+  font-weight: 850;
+  overflow-wrap: anywhere;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
 button,
 .file-input {
   border: 0;
@@ -614,5 +679,14 @@ textarea {
 
   .summary-tools button {
     flex: 1 1 100%;
+  }
+
+  .confirm-summary div {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+
+  .confirm-actions {
+    display: grid;
   }
 }

@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b3f3a">
   <title>ETIQUETAS HMT</title>
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./styles.css?v=23">
+  <link rel="stylesheet" href="./styles.css?v=24">
 </head>
 <body>
   <div class="app-shell">
@@ -193,6 +193,17 @@
     </main>
   </div>
 
+  <div id="confirm-overlay" class="confirm-overlay" hidden>
+    <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+      <h2 id="confirm-title">Conferir antes de enviar</h2>
+      <div id="confirm-summary" class="confirm-summary"></div>
+      <div class="confirm-actions">
+        <button id="confirm-send" type="button">Confirmar envio</button>
+        <button id="cancel-send" type="button" class="secondary">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
   <script>
@@ -213,6 +224,6 @@
       }
     })();
   </script>
-  <script src="./app.js?v=23" type="module"></script>
+  <script src="./app.js?v=24" type="module"></script>
 </body>
 </html>

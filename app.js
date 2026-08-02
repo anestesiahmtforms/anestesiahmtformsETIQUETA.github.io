@@ -38,6 +38,10 @@ const summaryTotalsEl = document.querySelector("#summary-totals");
 const summaryListEl = document.querySelector("#summary-list");
 const monthlyStatusEl = document.querySelector("#monthly-status");
 const sendFeedbackEl = document.querySelector("#send-feedback");
+const confirmOverlayEl = document.querySelector("#confirm-overlay");
+const confirmSummaryEl = document.querySelector("#confirm-summary");
+const confirmSendEl = document.querySelector("#confirm-send");
+const cancelSendEl = document.querySelector("#cancel-send");
 
 const fields = {
   data: document.querySelector("#data"),
@@ -389,21 +393,8 @@ async function sendToSheet() {
     return;
   }
 
-  const confirmation = [
-    "Conferir dados antes do envio:",
-    "",
-    `Data: ${formatDate(payload.data)}`,
-    `Nome: ${payload.nomePaciente}`,
-    `Cirurgia: ${payload.cirurgia}`,
-    `Atendimento: ${payload.atendimento}`,
-    `Tipo: ${payload.tipo}`,
-    `Credor: ${payload.credor}`,
-    `Plantonista(s): ${payload.plantonistas || "Nao necessario"}`,
-    "",
-    "Enviar agora?",
-  ].join("\n");
-
-  if (!window.confirm(confirmation)) {
+  const confirmed = await confirmSubmission(payload);
+  if (!confirmed) {
     setSendFeedback("Envio cancelado para conferencia.", "neutral");
     setStatus("Envio cancelado para conferencia.", "info");
     return;
@@ -454,6 +445,56 @@ function setSendFeedback(message, tone = "neutral") {
   sendFeedbackEl.textContent = message;
   sendFeedbackEl.dataset.tone = tone;
   sendFeedbackEl.hidden = !message;
+}
+
+function confirmSubmission(payload) {
+  if (!confirmOverlayEl || !confirmSummaryEl || !confirmSendEl || !cancelSendEl) {
+    return Promise.resolve(false);
+  }
+
+  confirmSummaryEl.innerHTML = `
+    <dl>
+      <div><dt>Data</dt><dd>${escapeHtml(formatDate(payload.data))}</dd></div>
+      <div><dt>Nome</dt><dd>${escapeHtml(payload.nomePaciente)}</dd></div>
+      <div><dt>Cirurgia</dt><dd>${escapeHtml(payload.cirurgia)}</dd></div>
+      <div><dt>Atendimento</dt><dd>${escapeHtml(payload.atendimento)}</dd></div>
+      <div><dt>Tipo</dt><dd>${escapeHtml(payload.tipo)}</dd></div>
+      <div><dt>Credor</dt><dd>${escapeHtml(payload.credor)}</dd></div>
+      <div><dt>Plantonista(s)</dt><dd>${escapeHtml(payload.plantonistas || "Nao necessario")}</dd></div>
+    </dl>
+  `;
+
+  confirmOverlayEl.hidden = false;
+  confirmSendEl.focus();
+
+  return new Promise((resolve) => {
+    const finish = (confirmed) => {
+      confirmOverlayEl.hidden = true;
+      confirmSendEl.removeEventListener("click", onConfirm);
+      cancelSendEl.removeEventListener("click", onCancel);
+      confirmOverlayEl.removeEventListener("click", onBackdrop);
+      document.removeEventListener("keydown", onKeydown);
+      resolve(confirmed);
+    };
+
+    const onConfirm = () => finish(true);
+    const onCancel = () => finish(false);
+    const onBackdrop = (event) => {
+      if (event.target === confirmOverlayEl) {
+        finish(false);
+      }
+    };
+    const onKeydown = (event) => {
+      if (event.key === "Escape") {
+        finish(false);
+      }
+    };
+
+    confirmSendEl.addEventListener("click", onConfirm);
+    cancelSendEl.addEventListener("click", onCancel);
+    confirmOverlayEl.addEventListener("click", onBackdrop);
+    document.addEventListener("keydown", onKeydown);
+  });
 }
 
 async function refreshDisplayedSummaries() {
