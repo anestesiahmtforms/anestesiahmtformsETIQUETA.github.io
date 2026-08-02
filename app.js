@@ -58,7 +58,7 @@ const plantonistasUi = {
 
 document.querySelector("#start-camera").addEventListener("click", startCamera);
 document.querySelector("#capture-image").addEventListener("click", captureFromCamera);
-document.querySelector("#upload-image").addEventListener("change", handleFileUpload);
+document.querySelector("#upload-image")?.addEventListener("change", handleFileUpload);
 document.querySelector("#process-image").addEventListener("click", processCurrentImage);
 document.querySelector("#send-sheet").addEventListener("click", sendToSheet);
 document.querySelector("#clear-form").addEventListener("click", resetForm);
@@ -524,16 +524,17 @@ function renderSummary(rows, emptyMessage = "Nenhuma entrada encontrada nesta da
     return `
       <article class="summary-item${alertClass}">
         <div class="summary-index">${index + 1}</div>
-        <div>
+        <div class="summary-main">
           <strong>${escapeHtml(row.nomePaciente || "")}</strong>
           <span>Cirurgia ${escapeHtml(row.cirurgia || "")} | Atendimento ${escapeHtml(row.atendimento || "")}</span>
         </div>
-        <div>
+        <div class="summary-type">
           <b>${escapeHtml(row.tipo || "")}</b>
           <span>${escapeHtml(row.credor || "")}</span>
         </div>
-        <div>
-          <b>${escapeHtml(row.plantonistas || "")}</b>
+        <div class="summary-plantonistas">
+          <small>Plantonista(s)</small>
+          <b>${escapeHtml(row.plantonistas || "-")}</b>
           <span>${escapeHtml(row.observacoes || "")}</span>
         </div>
       </article>

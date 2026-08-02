@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b3f3a">
   <title>ETIQUETAS HMT</title>
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./styles.css?v=21">
+  <link rel="stylesheet" href="./styles.css?v=22">
 </head>
 <body>
   <div class="app-shell">
@@ -38,11 +38,8 @@
         <div class="actions">
           <button id="start-camera" type="button">Abrir camera</button>
           <button id="capture-image" type="button" class="secondary" disabled>Capturar</button>
-          <label class="file-input">
-            <input id="upload-image" type="file" accept="image/*" capture="environment">
-            Escolher foto
-          </label>
         </div>
+        <p class="capture-note">Use: Etiqueta Nítida e ambiente claro</p>
 
         <div class="preview-wrap">
           <img id="preview" alt="Previa da etiqueta capturada">
@@ -146,6 +143,7 @@
           <button id="send-sheet" type="button">ENVIAR</button>
           <button id="clear-form" type="button" class="secondary">Limpar</button>
         </div>
+        <p class="send-note">Conferir os dados e corrigir antes de enviar</p>
       </section>
 
       <section class="panel summary-panel">
@@ -214,6 +212,6 @@
       }
     })();
   </script>
-  <script src="./app.js?v=21" type="module"></script>
+  <script src="./app.js?v=22" type="module"></script>
 </body>
 </html>

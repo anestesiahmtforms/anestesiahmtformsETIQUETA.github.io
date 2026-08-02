@@ -186,6 +186,18 @@ video {
   margin-top: 13px;
 }
 
+.capture-note,
+.send-note {
+  margin: 9px 2px 0;
+  color: var(--brand);
+  font-size: 0.86rem;
+  font-weight: 850;
+}
+
+.send-note {
+  color: var(--danger);
+}
+
 button,
 .file-input {
   border: 0;
@@ -428,9 +440,9 @@ textarea {
 
 .summary-item {
   display: grid;
-  grid-template-columns: 34px 1.25fr 0.95fr 0.8fr;
-  gap: 10px;
-  align-items: center;
+  grid-template-columns: 34px minmax(0, 1.35fr) minmax(92px, 0.72fr) minmax(112px, 0.78fr);
+  gap: 12px;
+  align-items: start;
   padding: 11px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -438,18 +450,40 @@ textarea {
 }
 
 .summary-item div {
+  min-width: 0;
   display: grid;
-  gap: 3px;
+  gap: 4px;
 }
 
 .summary-item strong,
 .summary-item b {
   font-size: 0.92rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 .summary-item span {
   color: var(--muted);
   font-size: 0.8rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.summary-main {
+  padding-right: 2px;
+}
+
+.summary-plantonistas {
+  justify-items: start;
+}
+
+.summary-plantonistas small {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+  text-transform: uppercase;
 }
 
 .summary-index {
@@ -512,7 +546,14 @@ textarea {
   }
 
   .summary-item {
-    grid-template-columns: 28px 1fr;
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 8px 10px;
+  }
+
+  .summary-main,
+  .summary-type,
+  .summary-plantonistas {
+    grid-column: 2;
   }
 
   .summary-tools button {
