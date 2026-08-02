@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b3f3a">
   <title>ETIQUETAS SAHMT</title>
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./styles.css?v=30">
+  <link rel="stylesheet" href="./styles.css?v=31">
 </head>
 <body>
   <div class="app-shell">
@@ -148,7 +148,10 @@
           <h2>Resumo do dia</h2>
         </div>
 
-        <input id="summary-date" type="date" hidden>
+        <label class="summary-date-picker">
+          <span>Escolher outro dia</span>
+          <input id="summary-date" type="date">
+        </label>
         <div id="summary-totals" class="summary-totals" hidden></div>
         <div id="summary-list" class="summary-list">
           <p class="empty-state">Nenhum resumo carregado ainda.</p>
@@ -263,6 +266,6 @@
       }
     })();
   </script>
-  <script src="./app.js?v=30" type="module"></script>
+  <script src="./app.js?v=31" type="module"></script>
 </body>
 </html>

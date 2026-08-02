@@ -1045,12 +1045,9 @@ function renderObservationList(customEmptyMessage = "") {
   clearObservationSelection({ keepFeedback: true });
 
   const query = normalizeSearch(observationSearchEl.value);
-  const rows = state.observationRows.filter((row) => {
-    if (!query) {
-      return false;
-    }
-
-    return normalizeSearch([
+  const rows = state.observationRows.filter((row) => (
+    !query
+    || normalizeSearch([
       row.data,
       row.nomePaciente,
       row.cirurgia,
@@ -1059,15 +1056,15 @@ function renderObservationList(customEmptyMessage = "") {
       row.credor,
       row.plantonistas,
       row.observacoes,
-    ].join(" ")).includes(query);
-  }).slice(0, CONFIG.maxObservationResults);
+    ].join(" ")).includes(query)
+  )).slice(0, CONFIG.maxObservationResults);
 
   if (!state.observationRows.length) {
     observationListEl.innerHTML = `<p class="empty-state">${escapeHtml(customEmptyMessage || "Nenhum registro carregado para o mês selecionado.")}</p>`;
     return;
   }
 
-  if (!query) {
+  if (!query && rows.length === 0) {
     observationListEl.innerHTML = `<p class="empty-state">Digite nome, cirurgia ou atendimento para localizar o registro deste mês.</p>`;
     return;
   }
@@ -1088,6 +1085,10 @@ function renderObservationList(customEmptyMessage = "") {
 
   observationListEl.querySelectorAll(".observation-result").forEach((button) => {
     button.addEventListener("click", () => selectObservationRow(button.dataset.rowNumber));
+    button.addEventListener("touchend", (event) => {
+      event.preventDefault();
+      selectObservationRow(button.dataset.rowNumber);
+    }, { passive: false });
   });
 }
 
@@ -1104,6 +1105,7 @@ function selectObservationRow(rowNumber) {
   observationDateEl.textContent = `Data desta observação: ${formatDate(getTodayISO())}`;
   setObservationFeedback("", "neutral");
   observationTextEl.focus();
+  observationEditorEl.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function clearObservationSelection(options = {}) {
@@ -1183,6 +1185,7 @@ function renderSummary(rows, emptyMessage = "Nenhuma entrada encontrada nesta da
         <div class="summary-main">
           <strong>${escapeHtml(row.nomePaciente || "")}</strong>
           <span>Cirurgia ${escapeHtml(row.cirurgia || "")} | Atendimento ${escapeHtml(row.atendimento || "")}</span>
+          <small>Responsavel: ${escapeHtml(row.criadoPor || "Nao informado")}</small>
         </div>
         <div class="summary-type">
           <b>${escapeHtml(row.tipo || "")}</b>
@@ -1301,11 +1304,30 @@ async function generateMonthlyPdfForWhatsApp() {
     }
 
     const { blob, fileName, summaryText } = buildMonthlyPdf(rows, month);
+    const file = new File([blob], fileName, { type: "application/pdf" });
 
-    downloadBlob(blob, fileName);
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(summaryText + "\n\nPDF gerado e baixado no aparelho. Anexe o arquivo baixado nesta conversa.")}`;
+    if (navigator.canShare?.({ files: [file] }) && navigator.share) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: `ETIQUETAS SAHMT - ${formatMonth(month)}`,
+          text: summaryText,
+        });
+        preOpenedWhatsApp?.close?.();
+        setStatus("PDF mensal pronto para envio. Escolha o WhatsApp na tela de compartilhamento.", "success");
+        return;
+      } catch (shareError) {
+        if (shareError.name === "AbortError") {
+          preOpenedWhatsApp?.close?.();
+          setStatus("Compartilhamento cancelado.", "info");
+          return;
+        }
+      }
+    }
+
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(`${summaryText}\n\nEste navegador nao permitiu anexar o PDF automaticamente.`)}`;
     openWhatsAppUrl(whatsappUrl, preOpenedWhatsApp);
-    setStatus("PDF baixado. O WhatsApp foi aberto com a mensagem do relatorio.", "success");
+    setStatus("WhatsApp aberto. Este navegador nao permitiu anexar o PDF automaticamente.", "info");
   } catch (error) {
     preOpenedWhatsApp?.close?.();
     setStatus(`Falha ao gerar relatorio mensal: ${error.message}`, "error");
@@ -1332,6 +1354,7 @@ function buildMonthlyPdf(rows, month) {
     row.tipo || "",
     row.credor || "",
     row.plantonistas || "-",
+    row.criadoPor || "",
     row.observacoes || "",
   ]);
 
@@ -1345,21 +1368,22 @@ function buildMonthlyPdf(rows, month) {
 
   doc.autoTable({
     startY: 34,
-    head: [["#", "Data", "Nome do Paciente", "Cirurgia", "Atendimento", "Tipo", "Credor", "Plantonista(s)", "Observacoes"]],
+    head: [["#", "Data", "Nome do Paciente", "Cirurgia", "Atendimento", "Tipo", "Credor", "Plantonista(s)", "Responsavel", "Observacoes"]],
     body: tableRows,
     theme: "grid",
     styles: { fontSize: 7.6, cellPadding: 2, overflow: "linebreak", valign: "middle" },
     headStyles: { fillColor: [11, 63, 58], textColor: [255, 255, 255], fontStyle: "bold" },
     columnStyles: {
-      0: { cellWidth: 9 },
-      1: { cellWidth: 20 },
-      2: { cellWidth: 48 },
-      3: { cellWidth: 20 },
-      4: { cellWidth: 24 },
-      5: { cellWidth: 25 },
-      6: { cellWidth: 36 },
-      7: { cellWidth: 28 },
-      8: { cellWidth: 51 },
+      0: { cellWidth: 8 },
+      1: { cellWidth: 18 },
+      2: { cellWidth: 42 },
+      3: { cellWidth: 18 },
+      4: { cellWidth: 22 },
+      5: { cellWidth: 21 },
+      6: { cellWidth: 28 },
+      7: { cellWidth: 25 },
+      8: { cellWidth: 38 },
+      9: { cellWidth: 43 },
     },
     didParseCell(data) {
       if (data.section === "body") {

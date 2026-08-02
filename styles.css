@@ -691,12 +691,16 @@ textarea {
   display: grid;
   gap: 4px;
   width: 100%;
+  min-height: 58px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 12px;
   background: var(--surface-soft);
   color: var(--ink);
+  cursor: pointer;
   text-align: left;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .observation-result strong {
@@ -749,6 +753,27 @@ textarea {
   font-weight: 900;
 }
 
+.summary-date-picker {
+  display: grid;
+  gap: 7px;
+  margin: 12px 0 10px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.summary-date-picker input {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-transform: none;
+}
+
 .summary-totals {
   display: flex;
   gap: 8px;
@@ -796,6 +821,14 @@ textarea {
 .summary-item span {
   color: var(--muted);
   font-size: 0.8rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.summary-item small {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 850;
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
