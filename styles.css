@@ -383,6 +383,29 @@ textarea {
   flex: 1 1 180px;
 }
 
+.monthly-status {
+  margin: 12px 0 0;
+  padding: 12px 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.monthly-status[data-tone="success"] {
+  border-color: rgba(22, 101, 52, 0.24);
+  background: rgba(220, 252, 231, 0.68);
+  color: #166534;
+}
+
+.monthly-status[data-tone="error"] {
+  border-color: rgba(185, 28, 28, 0.24);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
 .summary-totals {
   display: flex;
   gap: 8px;

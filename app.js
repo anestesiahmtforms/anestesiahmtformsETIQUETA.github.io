@@ -21,6 +21,7 @@ const state = {
   metadata: null,
   config: loadConfig(),
   summaryRows: [],
+  monthlyRows: [],
 };
 
 const cameraEl = document.querySelector("#camera");
@@ -35,6 +36,7 @@ const summaryDateEl = document.querySelector("#summary-date");
 const reportMonthEl = document.querySelector("#report-month");
 const summaryTotalsEl = document.querySelector("#summary-totals");
 const summaryListEl = document.querySelector("#summary-list");
+const monthlyStatusEl = document.querySelector("#monthly-status");
 
 const fields = {
   data: document.querySelector("#data"),
@@ -63,8 +65,16 @@ document.querySelector("#clear-form").addEventListener("click", resetForm);
 document.querySelector("#save-settings").addEventListener("click", saveSettings);
 document.querySelector("#generate-month-pdf-whatsapp").addEventListener("click", generateMonthlyPdfForWhatsApp);
 summaryDateEl.addEventListener("change", loadSummary);
+reportMonthEl.addEventListener("change", loadMonthlySummary);
 fields.credor.addEventListener("change", syncPlantonistasRequirement);
 document.addEventListener("click", closePlantonistasPickerOnOutsideClick);
+window.addEventListener("focus", refreshDisplayedSummaries);
+window.addEventListener("pageshow", refreshDisplayedSummaries);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    refreshDisplayedSummaries();
+  }
+});
 
 bootstrap();
 
@@ -79,6 +89,7 @@ async function bootstrap() {
   renderSheetStatus();
   await loadMetadata();
   await loadSummary({ silent: true });
+  await loadMonthlySummary({ silent: true });
   registerServiceWorker();
 }
 
@@ -100,6 +111,7 @@ async function saveSettings() {
   renderSheetStatus();
   await loadMetadata();
   await loadSummary({ silent: true });
+  await loadMonthlySummary({ silent: true });
   setStatus("URL do Apps Script salva neste aparelho.", "success");
 }
 
@@ -411,13 +423,26 @@ async function sendToSheet() {
     const sentDate = payload.data;
     resetForm({ keepImage: false, keepDate: sentDate });
     summaryDateEl.value = sentDate;
+    reportMonthEl.value = sentDate.slice(0, 7);
     await loadSummary({ silent: true });
+    await loadMonthlySummary({ silent: true });
     setStatus("Dados enviados com sucesso para a planilha.", "success");
   } catch (error) {
     setStatus(`Falha ao enviar para a planilha: ${error.message}`, "error");
   } finally {
     toggleBusy(false);
   }
+}
+
+async function refreshDisplayedSummaries() {
+  if (!state.config.scriptUrl) {
+    return;
+  }
+
+  await Promise.all([
+    loadSummary({ silent: true }),
+    loadMonthlySummary({ silent: true }),
+  ]);
 }
 
 async function loadSummary(options = {}) {
@@ -450,6 +475,40 @@ async function loadSummary(options = {}) {
       setStatus(`Falha ao carregar resumo: ${error.message}`, "error");
     }
   }
+}
+
+async function loadMonthlySummary(options = {}) {
+  if (!state.config.scriptUrl) {
+    state.monthlyRows = [];
+    renderMonthlyStatus("Configure a URL do Apps Script para atualizar o relatorio mensal.", "error");
+    return;
+  }
+
+  const month = reportMonthEl.value || getTodayISO().slice(0, 7);
+  try {
+    state.monthlyRows = await loadMonthlyEntries(month);
+    const alertCount = state.monthlyRows.filter((row) => isAlertType(row.tipo)).length;
+    const updatedAt = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    renderMonthlyStatus(
+      `${state.monthlyRows.length} entrada(s) em ${formatMonth(month)}. ${alertCount} alerta(s). Atualizado as ${updatedAt}.`,
+      state.monthlyRows.length ? "success" : "neutral"
+    );
+
+    if (!options.silent) {
+      setStatus("Relatorio mensal atualizado.", "success");
+    }
+  } catch (error) {
+    state.monthlyRows = [];
+    renderMonthlyStatus(`Nao foi possivel atualizar o relatorio mensal: ${error.message}`, "error");
+    if (!options.silent) {
+      setStatus(`Falha ao atualizar relatorio mensal: ${error.message}`, "error");
+    }
+  }
+}
+
+function renderMonthlyStatus(message, tone = "neutral") {
+  monthlyStatusEl.textContent = message;
+  monthlyStatusEl.dataset.tone = tone;
 }
 
 function renderSummary(rows, emptyMessage = "Nenhuma entrada encontrada nesta data.") {
@@ -573,6 +632,9 @@ async function generateMonthlyPdfForWhatsApp() {
 
   try {
     const rows = await loadMonthlyEntries(month);
+    state.monthlyRows = rows;
+    const alertCount = rows.filter((row) => isAlertType(row.tipo)).length;
+    renderMonthlyStatus(`${rows.length} entrada(s) em ${formatMonth(month)}. ${alertCount} alerta(s).`, rows.length ? "success" : "neutral");
     if (!rows.length) {
       setStatus("Nenhuma entrada encontrada para o mes selecionado.", "error");
       return;

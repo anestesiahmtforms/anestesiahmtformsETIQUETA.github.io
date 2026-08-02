@@ -1,4 +1,4 @@
-const CACHE_NAME = "etiqueta-hmt-ia-v19";
+const CACHE_NAME = "etiqueta-hmt-ia-v20";
 const ASSETS = [
   "./",
   "./index.html",
@@ -28,19 +28,21 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) {
-        return cached;
-      }
+  const requestUrl = new URL(event.request.url);
+  if (requestUrl.origin !== self.location.origin) {
+    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+    return;
+  }
 
-      return fetch(event.request)
-        .then((response) => {
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
+        if (response && response.ok) {
           const responseClone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
-          return response;
-        })
-        .catch(() => caches.match("./index.html"));
-    })
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request).then((cached) => cached || caches.match("./index.html")))
   );
 });
