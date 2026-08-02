@@ -27,9 +27,18 @@ Atendimento: 7525561
 - `Tipo`: `Particular`, `Complementação`, `Unimed`, `Outros`.
 - `Credor`: `Caixa`, `Plantão`, `Plantão/Caixa`.
 - `Plantonista(s)`: caixa de selecao multipla. Quando `Credor` for `Caixa`, o campo fica desativado.
-- `Observacoes`, opcional.
-
 Antes do envio, o app mostra uma confirmacao para conferencia dos dados.
+
+## Observacoes posteriores
+
+O campo `Observacoes` nao aparece mais na entrada principal. Para sinalizar um registro depois do envio:
+
+1. Selecione o mes em `Relatorio mensal`.
+2. Em `Observacoes do mes`, busque por nome, cirurgia ou atendimento.
+3. Toque no registro desejado.
+4. Digite a observacao e toque em `Salvar observacao`.
+
+A observacao e gravada somente naquele registro especifico da aba `ETIQUETA`.
 
 ## Planilha Google
 

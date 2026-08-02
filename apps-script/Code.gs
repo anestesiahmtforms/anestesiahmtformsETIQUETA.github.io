@@ -87,6 +87,11 @@ function doPost(e) {
     }
 
     ensureWorkbook_();
+
+    if (action === "updateObservation") {
+      return handleUpdateObservation_(payload);
+    }
+
     validatePayload_(payload);
 
     const sheet = getSpreadsheet_().getSheetByName(REGISTROS_SHEET);
@@ -290,6 +295,27 @@ function validatePayload_(payload) {
   }
 }
 
+function handleUpdateObservation_(payload) {
+  const rowNumber = Number(payload.rowNumber || 0);
+  if (!Number.isInteger(rowNumber) || rowNumber < 2) {
+    throw new Error("Registro invalido para atualizar observacao.");
+  }
+
+  const sheet = getSpreadsheet_().getSheetByName(REGISTROS_SHEET);
+  if (!sheet || rowNumber > sheet.getLastRow()) {
+    throw new Error("Registro nao encontrado na planilha.");
+  }
+
+  const observacoesColumn = REGISTROS_HEADERS.indexOf("Observacoes") + 1;
+  sheet.getRange(rowNumber, observacoesColumn).setValue(String(payload.observacoes || "").trim());
+
+  return jsonResponse({
+    ok: true,
+    message: "Observacao atualizada com sucesso.",
+    entry: rowToEntry_(sheet.getRange(rowNumber, 1, 1, REGISTROS_HEADERS.length).getDisplayValues()[0], rowNumber),
+  });
+}
+
 function getEntriesByDate_(date) {
   const sheet = getSpreadsheet_().getSheetByName(REGISTROS_SHEET);
   if (!sheet) {
@@ -303,8 +329,8 @@ function getEntriesByDate_(date) {
 
   const values = sheet.getRange(2, 1, lastRow - 1, REGISTROS_HEADERS.length).getDisplayValues();
   return values
-    .filter((row) => normalizeDate_(row[0]) === date)
-    .map(rowToEntry_);
+    .map((row, index) => rowToEntry_(row, index + 2))
+    .filter((entry) => entry.data === date);
 }
 
 function getEntriesByMonth_(month) {
@@ -320,12 +346,13 @@ function getEntriesByMonth_(month) {
 
   const values = sheet.getRange(2, 1, lastRow - 1, REGISTROS_HEADERS.length).getDisplayValues();
   return values
-    .filter((row) => normalizeDate_(row[0]).slice(0, 7) === month)
-    .map(rowToEntry_);
+    .map((row, index) => rowToEntry_(row, index + 2))
+    .filter((entry) => entry.data.slice(0, 7) === month);
 }
 
-function rowToEntry_(row) {
+function rowToEntry_(row, rowNumber) {
   return {
+    rowNumber,
     data: normalizeDate_(row[0]),
     nomePaciente: row[1],
     cirurgia: row[2],
