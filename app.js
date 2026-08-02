@@ -1,5 +1,6 @@
 const CONFIG = {
   storageKey: "etiqueta-hmt-ia-v1",
+  authSessionKey: "etiqueta-hmt-auth-session-v1",
   googleClientId: "908976987584-o59p0obmvq013lg3t9726itf06e15v2c.apps.googleusercontent.com",
   guideWidthRatio: 0.94,
   guideAspectRatio: 3.35,
@@ -121,16 +122,21 @@ async function bootstrap() {
     registerServiceWorker();
     return;
   }
-  await loadMetadata();
-  await loadSummary({ silent: true });
-  await loadMonthlySummary({ silent: true });
-  await loadObservationRecords({ silent: true });
+  await initializeAuthorizedApp();
   registerServiceWorker();
 }
 
 async function authenticateUser() {
   showAuthGate("Verificando sua conta Google cadastrada...");
   renderAuthStatus();
+
+  const cachedAuth = restoreAuthSession();
+  if (cachedAuth) {
+    applyAuthenticatedUser(cachedAuth);
+    hideAuthGate();
+    renderAuthStatus();
+    return true;
+  }
 
   if (!CONFIG.googleClientId) {
     showAuthGate("Você precisa estar logado em sua conta Google Cadastrada para entrar");
@@ -142,13 +148,13 @@ async function authenticateUser() {
     const credential = await requestGoogleCredential();
     const authResult = await validateGoogleCredential(credential);
 
-    state.auth = {
+    applyAuthenticatedUser({
       token: credential,
       email: String(authResult.email || "").toLowerCase(),
       name: authResult.name || "",
       expiresAt: getJwtExpirationMs(credential),
-    };
-    state.authenticated = true;
+    });
+    persistAuthSession();
     hideAuthGate();
     renderAuthStatus();
     return true;
@@ -156,10 +162,20 @@ async function authenticateUser() {
     console.warn("Falha na autenticacao Google:", error);
     state.auth = null;
     state.authenticated = false;
+    clearAuthSession();
     renderAuthStatus();
     showAuthGate("Você precisa estar logado em sua conta Google Cadastrada para entrar");
     return false;
   }
+}
+
+async function initializeAuthorizedApp() {
+  await Promise.all([
+    loadMetadata(),
+    loadSummary({ silent: true }),
+    loadMonthlySummary({ silent: true }),
+    loadObservationRecords({ silent: true }),
+  ]);
 }
 
 function waitForGoogleIdentity() {
@@ -199,6 +215,7 @@ function requestGoogleCredential() {
       auto_select: true,
       cancel_on_tap_outside: false,
       itp_support: true,
+      use_fedcm_for_prompt: true,
       callback(response) {
         if (settled) {
           return;
@@ -224,6 +241,55 @@ function requestGoogleCredential() {
       }
     });
   });
+}
+
+function applyAuthenticatedUser(auth) {
+  state.auth = {
+    token: auth.token,
+    email: String(auth.email || "").toLowerCase(),
+    name: auth.name || "",
+    expiresAt: Number(auth.expiresAt || 0),
+  };
+  state.authenticated = Boolean(state.auth.token && state.auth.email);
+}
+
+function persistAuthSession() {
+  if (!state.auth?.token || !state.auth?.email) {
+    return;
+  }
+
+  try {
+    sessionStorage.setItem(CONFIG.authSessionKey, JSON.stringify(state.auth));
+  } catch (error) {
+    console.warn("Nao foi possivel salvar sessao Google:", error);
+  }
+}
+
+function restoreAuthSession() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(CONFIG.authSessionKey) || "null");
+    if (!saved?.token || !saved?.email) {
+      return null;
+    }
+
+    if (Number(saved.expiresAt || 0) <= Date.now() + 120000) {
+      clearAuthSession();
+      return null;
+    }
+
+    return saved;
+  } catch {
+    clearAuthSession();
+    return null;
+  }
+}
+
+function clearAuthSession() {
+  try {
+    sessionStorage.removeItem(CONFIG.authSessionKey);
+  } catch {
+    // Sessao indisponivel; sem impacto funcional.
+  }
 }
 
 async function validateGoogleCredential(idToken) {
@@ -293,6 +359,7 @@ function ensureAuthenticated() {
 
   if (state.auth.expiresAt && Date.now() > state.auth.expiresAt - 60000) {
     state.authenticated = false;
+    clearAuthSession();
     renderAuthStatus();
     showAuthGate("Você precisa estar logado em sua conta Google Cadastrada para entrar");
     throw new Error("Você precisa estar logado em sua conta Google Cadastrada para entrar");
@@ -332,10 +399,7 @@ async function saveSettings() {
   state.config.scriptUrl = scriptUrlEl.value.trim();
   localStorage.setItem(CONFIG.storageKey, JSON.stringify(state.config));
   renderSheetStatus();
-  await loadMetadata();
-  await loadSummary({ silent: true });
-  await loadMonthlySummary({ silent: true });
-  await loadObservationRecords({ silent: true });
+  await initializeAuthorizedApp();
   setStatus("URL do Apps Script salva neste aparelho.", "success");
 }
 
@@ -644,9 +708,11 @@ async function sendToSheet() {
     resetForm({ keepImage: false, keepDate: sentDate });
     summaryDateEl.value = sentDate;
     reportMonthEl.value = sentDate.slice(0, 7);
-    await loadSummary({ silent: true });
-    await loadMonthlySummary({ silent: true });
-    await loadObservationRecords({ silent: true });
+    await Promise.all([
+      loadSummary({ silent: true }),
+      loadMonthlySummary({ silent: true }),
+      loadObservationRecords({ silent: true }),
+    ]);
     setSendFeedback("Dados enviados com sucesso!", "success");
     setStatus("Dados enviados com sucesso!", "success");
   } catch (error) {
@@ -1151,9 +1217,11 @@ async function saveSelectedObservation() {
     observationSearchEl.value = "";
     observationListEl.innerHTML = "";
     clearObservationSelection({ keepFeedback: true });
-    await loadSummary({ silent: true });
-    await loadMonthlySummary({ silent: true });
-    await loadObservationRecords({ silent: true });
+    await Promise.all([
+      loadSummary({ silent: true }),
+      loadMonthlySummary({ silent: true }),
+      loadObservationRecords({ silent: true }),
+    ]);
     setObservationFeedback("Observação enviada com sucesso!", "success");
   } catch (error) {
     setObservationFeedback(`Falha ao salvar observação: ${error.message}`, "error");
