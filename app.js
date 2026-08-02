@@ -1068,7 +1068,7 @@ function renderObservationList(customEmptyMessage = "") {
   }
 
   if (!query) {
-    observationListEl.innerHTML = `<p class="empty-state">Digite nome, cirurgia ou atendimento para localizar o registro deste mês.</p>`;
+    observationListEl.innerHTML = "";
     return;
   }
 
@@ -1108,8 +1108,6 @@ function selectObservationRow(rowNumber) {
   observationTargetEl.textContent = `${formatDate(selected.data || "")} | ${selected.nomePaciente || ""} | Cirurgia ${selected.cirurgia || ""} | Atendimento ${selected.atendimento || ""} | ${selected.tipo || ""} | ${selected.credor || ""} | Plantonista(s): ${selected.plantonistas || "Nao necessario"} | Lancado por: ${selected.criadoPor || "Nao informado"} | Observacao feita por: ${selected.observacaoAtualizadaPor || "Sem observacao registrada"}`;
   observationDateEl.textContent = `Data desta observação: ${formatDate(getTodayISO())}`;
   setObservationFeedback("", "neutral");
-  observationTextEl.focus();
-  observationEditorEl.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function clearObservationSelection(options = {}) {
@@ -1150,15 +1148,13 @@ async function saveSelectedObservation() {
       throw new Error(result.message || "Falha ao salvar observação.");
     }
 
-    const searchTerm = state.selectedObservationRow.nomePaciente || "";
-    setObservationFeedback("Observação salva com sucesso!", "success");
-    observationSearchEl.value = searchTerm;
-    if (result.entry) {
-      state.selectedObservationRow = result.entry;
-    }
+    observationSearchEl.value = "";
+    observationListEl.innerHTML = "";
+    clearObservationSelection({ keepFeedback: true });
     await loadSummary({ silent: true });
     await loadMonthlySummary({ silent: true });
     await loadObservationRecords({ silent: true });
+    setObservationFeedback("Observação enviada com sucesso!", "success");
   } catch (error) {
     setObservationFeedback(`Falha ao salvar observação: ${error.message}`, "error");
   } finally {
@@ -1202,6 +1198,7 @@ function renderSummary(rows, emptyMessage = "Nenhuma entrada encontrada nesta da
           <small>Plantonista(s)</small>
           <b>${escapeHtml(row.plantonistas || "-")}</b>
           <span>${escapeHtml(row.observacoes || "")}</span>
+          <small>Observacao feita por: ${escapeHtml(row.observacaoAtualizadaPor || "Sem observacao registrada")}</small>
         </div>
       </article>
     `;
@@ -1371,6 +1368,7 @@ function buildMonthlyPdf(rows, month) {
     row.credor || "",
     row.plantonistas || "-",
     row.criadoPor || "",
+    row.observacaoAtualizadaPor || "",
     row.observacoes || "",
   ]);
 
@@ -1384,22 +1382,23 @@ function buildMonthlyPdf(rows, month) {
 
   doc.autoTable({
     startY: 34,
-    head: [["#", "Data", "Nome do Paciente", "Cirurgia", "Atendimento", "Tipo", "Credor", "Plantonista(s)", "Responsavel", "Observacoes"]],
+    head: [["#", "Data", "Nome do Paciente", "Cirurgia", "Atendimento", "Tipo", "Credor", "Plantonista(s)", "Responsavel", "Obs. por", "Observacoes"]],
     body: tableRows,
     theme: "grid",
     styles: { fontSize: 7.6, cellPadding: 2, overflow: "linebreak", valign: "middle" },
     headStyles: { fillColor: [11, 63, 58], textColor: [255, 255, 255], fontStyle: "bold" },
     columnStyles: {
-      0: { cellWidth: 8 },
-      1: { cellWidth: 18 },
-      2: { cellWidth: 42 },
-      3: { cellWidth: 18 },
-      4: { cellWidth: 22 },
-      5: { cellWidth: 21 },
-      6: { cellWidth: 28 },
-      7: { cellWidth: 25 },
-      8: { cellWidth: 38 },
-      9: { cellWidth: 43 },
+      0: { cellWidth: 7 },
+      1: { cellWidth: 17 },
+      2: { cellWidth: 38 },
+      3: { cellWidth: 17 },
+      4: { cellWidth: 21 },
+      5: { cellWidth: 19 },
+      6: { cellWidth: 24 },
+      7: { cellWidth: 22 },
+      8: { cellWidth: 31 },
+      9: { cellWidth: 31 },
+      10: { cellWidth: 34 },
     },
     didParseCell(data) {
       if (data.section === "body") {
