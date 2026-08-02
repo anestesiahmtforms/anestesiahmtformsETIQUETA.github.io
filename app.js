@@ -37,6 +37,7 @@ const reportMonthEl = document.querySelector("#report-month");
 const summaryTotalsEl = document.querySelector("#summary-totals");
 const summaryListEl = document.querySelector("#summary-list");
 const monthlyStatusEl = document.querySelector("#monthly-status");
+const sendFeedbackEl = document.querySelector("#send-feedback");
 
 const fields = {
   data: document.querySelector("#data"),
@@ -369,8 +370,10 @@ function collectFormData() {
 }
 
 async function sendToSheet() {
+  setSendFeedback("", "neutral");
+
   if (!state.config.scriptUrl) {
-    setStatus("Salve primeiro a URL do Google Apps Script.", "error");
+    showSendError("Salve primeiro a URL do Google Apps Script.");
     return;
   }
 
@@ -382,7 +385,7 @@ async function sendToSheet() {
 
   const missing = requiredFields.filter((key) => !payload[key]);
   if (missing.length) {
-    setStatus("Preencha Data, Nome, Cirurgia, Atendimento, Tipo, Credor e Plantonista(s) quando necessario antes de enviar.", "error");
+    showSendError("Preencha Data, Nome, Cirurgia, Atendimento, Tipo, Credor e Plantonista(s) quando necessario antes de enviar.");
     return;
   }
 
@@ -401,11 +404,13 @@ async function sendToSheet() {
   ].join("\n");
 
   if (!window.confirm(confirmation)) {
+    setSendFeedback("Envio cancelado para conferencia.", "neutral");
     setStatus("Envio cancelado para conferencia.", "info");
     return;
   }
 
   toggleBusy(true);
+  setSendFeedback("Enviando para a planilha...", "neutral");
   setStatus("Enviando para a planilha...", "info");
 
   try {
@@ -426,12 +431,29 @@ async function sendToSheet() {
     reportMonthEl.value = sentDate.slice(0, 7);
     await loadSummary({ silent: true });
     await loadMonthlySummary({ silent: true });
+    setSendFeedback("Dados enviados com sucesso para a planilha.", "success");
     setStatus("Dados enviados com sucesso para a planilha.", "success");
   } catch (error) {
-    setStatus(`Falha ao enviar para a planilha: ${error.message}`, "error");
+    showSendError(`Falha ao enviar para a planilha: ${error.message}`);
   } finally {
     toggleBusy(false);
   }
+}
+
+function showSendError(message) {
+  setSendFeedback(message, "error");
+  setStatus(message, "error");
+  sendFeedbackEl?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function setSendFeedback(message, tone = "neutral") {
+  if (!sendFeedbackEl) {
+    return;
+  }
+
+  sendFeedbackEl.textContent = message;
+  sendFeedbackEl.dataset.tone = tone;
+  sendFeedbackEl.hidden = !message;
 }
 
 async function refreshDisplayedSummaries() {
@@ -749,6 +771,7 @@ function resetForm(options = {}) {
   fields.data.value = options.keepDate ? selectedDate : getTodayISO();
   clearPlantonistasSelection();
   syncPlantonistasRequirement();
+  setSendFeedback("", "neutral");
 
   if (!options.keepImage) {
     clearImage();
