@@ -1273,14 +1273,17 @@ function renderSummary(rows, emptyMessage = "Nenhuma entrada encontrada nesta da
 
   summaryListEl.innerHTML = rows.map((row, index) => {
     const alertClass = isAlertType(row.tipo) ? " alert-row" : "";
+    const editedClass = row.editadoEm || row.editadoPor || row.resumoEdicao ? " edited-row" : "";
+    const editNote = row.resumoEdicao
+      ? `<small class="summary-edit-note">Alterado: ${escapeHtml(row.resumoEdicao)}</small>`
+      : "";
     return `
-      <article class="summary-item${alertClass}" data-row-number="${escapeHtml(row.rowNumber || "")}" tabindex="0" title="Toque duas vezes para editar">
+      <article class="summary-item${alertClass}${editedClass}" data-row-number="${escapeHtml(row.rowNumber || "")}" tabindex="0" title="Toque duas vezes para editar">
         <div class="summary-index">${index + 1}</div>
         <div class="summary-main">
           <strong>${escapeHtml(row.nomePaciente || "")}</strong>
           <span>Data ${escapeHtml(formatDate(row.data || ""))} | Cirurgia ${escapeHtml(row.cirurgia || "")} | Atendimento ${escapeHtml(row.atendimento || "")}</span>
           <small>Responsavel: ${escapeHtml(row.criadoPor || "Nao informado")}</small>
-          <small>Editado por: ${escapeHtml(row.editadoPor || "Sem edicao registrada")}</small>
         </div>
         <div class="summary-type">
           <b>${escapeHtml(row.tipo || "")}</b>
@@ -1290,8 +1293,10 @@ function renderSummary(rows, emptyMessage = "Nenhuma entrada encontrada nesta da
           <small>Plantonista(s)</small>
           <b>${escapeHtml(row.plantonistas || "-")}</b>
           <span>${escapeHtml(row.observacoes || "")}</span>
-          <small>Ultima edicao: ${escapeHtml(row.editadoEm || "Sem edicao")}</small>
+          <small class="summary-edit-meta">Ultima edicao: ${escapeHtml(row.editadoEm || "Sem edicao")}</small>
+          <small class="summary-edit-meta">Editado por: ${escapeHtml(row.editadoPor || "Sem edicao registrada")}</small>
         </div>
+        ${editNote}
       </article>
     `;
   }).join("");
@@ -1533,6 +1538,12 @@ function generatePdfReport() {
           data.cell.styles.textColor = [185, 28, 28];
           data.cell.styles.fontStyle = "bold";
           data.cell.styles.fillColor = [255, 241, 242];
+        } else if (row?.resumoEdicao) {
+          data.cell.styles.fillColor = [240, 253, 244];
+        }
+        if (data.column.index === 10 && row?.resumoEdicao) {
+          data.cell.styles.textColor = [29, 78, 216];
+          data.cell.styles.fontStyle = "bold";
         }
       }
     },
@@ -1620,6 +1631,7 @@ function buildMonthlyPdf(rows, month) {
     row.plantonistas || "-",
     row.criadoPor || "",
     row.editadoPor || "",
+    row.resumoEdicao || "",
     row.observacoes || "",
   ]);
 
@@ -1633,7 +1645,7 @@ function buildMonthlyPdf(rows, month) {
 
   doc.autoTable({
     startY: 34,
-    head: [["#", "Data", "Nome do Paciente", "Cirurgia", "Atendimento", "Tipo", "Credor", "Plantonista(s)", "Responsavel", "Editado por", "Observacoes"]],
+    head: [["#", "Data", "Nome do Paciente", "Cirurgia", "Atendimento", "Tipo", "Credor", "Plantonista(s)", "Responsavel", "Editado por", "Alteracoes", "Observacoes"]],
     body: tableRows,
     theme: "grid",
     styles: { fontSize: 7.6, cellPadding: 2, overflow: "linebreak", valign: "middle" },
@@ -1647,9 +1659,10 @@ function buildMonthlyPdf(rows, month) {
       5: { cellWidth: 19 },
       6: { cellWidth: 24 },
       7: { cellWidth: 22 },
-      8: { cellWidth: 31 },
-      9: { cellWidth: 31 },
-      10: { cellWidth: 34 },
+      8: { cellWidth: 28 },
+      9: { cellWidth: 28 },
+      10: { cellWidth: 35 },
+      11: { cellWidth: 25 },
     },
     didParseCell(data) {
       if (data.section === "body") {
@@ -1658,6 +1671,12 @@ function buildMonthlyPdf(rows, month) {
           data.cell.styles.textColor = [185, 28, 28];
           data.cell.styles.fontStyle = "bold";
           data.cell.styles.fillColor = [255, 241, 242];
+        } else if (row?.resumoEdicao) {
+          data.cell.styles.fillColor = [240, 253, 244];
+        }
+        if (data.column.index === 10 && row?.resumoEdicao) {
+          data.cell.styles.textColor = [29, 78, 216];
+          data.cell.styles.fontStyle = "bold";
         }
       }
     },

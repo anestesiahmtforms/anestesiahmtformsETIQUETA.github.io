@@ -81,6 +81,7 @@ const REGISTROS_HEADERS = [
   "Observacao atualizada por",
   "Editado em",
   "Editado por",
+  "Resumo da edicao",
 ];
 
 const TIPO_OPTIONS = ["Particular", "Complementação", "Unimed", "Outros"];
@@ -603,9 +604,11 @@ function handleUpdateObservation_(payload, user) {
   const observacoesColumn = REGISTROS_HEADERS.indexOf("Observacoes") + 1;
   const observacaoAtualizadaEmColumn = REGISTROS_HEADERS.indexOf("Observacao atualizada em") + 1;
   const observacaoAtualizadaPorColumn = REGISTROS_HEADERS.indexOf("Observacao atualizada por") + 1;
+  const resumoEdicaoColumn = REGISTROS_HEADERS.indexOf("Resumo da edicao") + 1;
   sheet.getRange(rowNumber, observacoesColumn).setValue(String(payload.observacoes || "").trim());
   sheet.getRange(rowNumber, observacaoAtualizadaEmColumn).setValue(new Date());
   sheet.getRange(rowNumber, observacaoAtualizadaPorColumn).setValue(user.email);
+  sheet.getRange(rowNumber, resumoEdicaoColumn).setValue("Observacoes atualizadas.");
   applyRowFormats_(sheet, rowNumber);
 
   return jsonResponse({
@@ -629,7 +632,8 @@ function handleUpdateRecord_(payload, user) {
     throw new Error("Registro nao encontrado na planilha.");
   }
 
-  sheet.getRange(rowNumber, 1, 1, 8).setValues([[
+  const oldEntry = rowToEntry_(sheet.getRange(rowNumber, 1, 1, REGISTROS_HEADERS.length).getDisplayValues()[0], rowNumber);
+  const updatedValues = [
     parseIsoDate_(payload.data) || payload.data || "",
     payload.nomePaciente || "",
     payload.cirurgia || "",
@@ -638,12 +642,17 @@ function handleUpdateRecord_(payload, user) {
     payload.credor || "",
     payload.credor === "Caixa" ? "" : (payload.plantonistas || ""),
     String(payload.observacoes || "").trim(),
-  ]]);
+  ];
+  const changeSummary = buildEditSummary_(oldEntry, payload);
+
+  sheet.getRange(rowNumber, 1, 1, 8).setValues([updatedValues]);
 
   const editadoEmColumn = REGISTROS_HEADERS.indexOf("Editado em") + 1;
   const editadoPorColumn = REGISTROS_HEADERS.indexOf("Editado por") + 1;
+  const resumoEdicaoColumn = REGISTROS_HEADERS.indexOf("Resumo da edicao") + 1;
   sheet.getRange(rowNumber, editadoEmColumn).setValue(new Date());
   sheet.getRange(rowNumber, editadoPorColumn).setValue(user.email);
+  sheet.getRange(rowNumber, resumoEdicaoColumn).setValue(changeSummary || "Registro revisado sem mudanca nos campos principais.");
   applyRowFormats_(sheet, rowNumber);
 
   return jsonResponse({
@@ -652,6 +661,36 @@ function handleUpdateRecord_(payload, user) {
     userEmail: user.email,
     entry: rowToEntry_(sheet.getRange(rowNumber, 1, 1, REGISTROS_HEADERS.length).getDisplayValues()[0], rowNumber),
   });
+}
+
+function buildEditSummary_(oldEntry, payload) {
+  const fields = [
+    { key: "data", label: "Data", oldValue: normalizeDate_(oldEntry.data), newValue: normalizeDate_(payload.data) },
+    { key: "nomePaciente", label: "Nome", oldValue: oldEntry.nomePaciente, newValue: payload.nomePaciente },
+    { key: "cirurgia", label: "Cirurgia", oldValue: oldEntry.cirurgia, newValue: payload.cirurgia },
+    { key: "atendimento", label: "Atendimento", oldValue: oldEntry.atendimento, newValue: payload.atendimento },
+    { key: "tipo", label: "Tipo", oldValue: oldEntry.tipo, newValue: payload.tipo },
+    { key: "credor", label: "Credor", oldValue: oldEntry.credor, newValue: payload.credor },
+    { key: "plantonistas", label: "Plantonista(s)", oldValue: oldEntry.plantonistas, newValue: payload.credor === "Caixa" ? "" : payload.plantonistas },
+    { key: "observacoes", label: "Observacoes", oldValue: oldEntry.observacoes, newValue: payload.observacoes },
+  ];
+
+  return fields
+    .filter(function(field) {
+      return normalizeCompare_(field.oldValue || "") !== normalizeCompare_(field.newValue || "");
+    })
+    .map(function(field) {
+      const oldText = formatEditValue_(field.oldValue);
+      const newText = formatEditValue_(field.newValue);
+      return field.label + ": " + oldText + " -> " + newText;
+    })
+    .join("; ")
+    .slice(0, 480);
+}
+
+function formatEditValue_(value) {
+  const text = String(value || "").trim();
+  return text || "(vazio)";
 }
 
 function buildObservacoes_(payload) {
@@ -706,6 +745,7 @@ function searchEntries_(query, limit) {
         entry.observacoes,
         entry.criadoPor,
         entry.editadoPor,
+        entry.resumoEdicao,
       ].join(" ")).indexOf(normalizedQuery) !== -1;
     })
     .slice(-maxRows)
@@ -745,6 +785,7 @@ function rowToEntry_(row, rowNumber) {
     observacaoAtualizadaPor: row[11],
     editadoEm: row[12] || row[10],
     editadoPor: row[13] || row[11],
+    resumoEdicao: row[14],
   };
 }
 
