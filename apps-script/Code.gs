@@ -605,10 +605,13 @@ function handleUpdateObservation_(payload, user) {
   const observacaoAtualizadaEmColumn = REGISTROS_HEADERS.indexOf("Observacao atualizada em") + 1;
   const observacaoAtualizadaPorColumn = REGISTROS_HEADERS.indexOf("Observacao atualizada por") + 1;
   const resumoEdicaoColumn = REGISTROS_HEADERS.indexOf("Resumo da edicao") + 1;
+  const oldEntry = rowToEntry_(sheet.getRange(rowNumber, 1, 1, REGISTROS_HEADERS.length).getDisplayValues()[0], rowNumber);
   sheet.getRange(rowNumber, observacoesColumn).setValue(String(payload.observacoes || "").trim());
   sheet.getRange(rowNumber, observacaoAtualizadaEmColumn).setValue(new Date());
   sheet.getRange(rowNumber, observacaoAtualizadaPorColumn).setValue(user.email);
-  sheet.getRange(rowNumber, resumoEdicaoColumn).setValue("Observacoes atualizadas.");
+  sheet.getRange(rowNumber, resumoEdicaoColumn).setValue(
+    appendEditHistory_(oldEntry.resumoEdicao, "Observacoes atualizadas.", user.email)
+  );
   applyRowFormats_(sheet, rowNumber);
 
   return jsonResponse({
@@ -652,7 +655,13 @@ function handleUpdateRecord_(payload, user) {
   const resumoEdicaoColumn = REGISTROS_HEADERS.indexOf("Resumo da edicao") + 1;
   sheet.getRange(rowNumber, editadoEmColumn).setValue(new Date());
   sheet.getRange(rowNumber, editadoPorColumn).setValue(user.email);
-  sheet.getRange(rowNumber, resumoEdicaoColumn).setValue(changeSummary || "Registro revisado sem mudanca nos campos principais.");
+  sheet.getRange(rowNumber, resumoEdicaoColumn).setValue(
+    appendEditHistory_(
+      oldEntry.resumoEdicao,
+      changeSummary || "Registro revisado sem mudanca nos campos principais.",
+      user.email
+    )
+  );
   applyRowFormats_(sheet, rowNumber);
 
   return jsonResponse({
@@ -691,6 +700,14 @@ function buildEditSummary_(oldEntry, payload) {
 function formatEditValue_(value) {
   const text = String(value || "").trim();
   return text || "(vazio)";
+}
+
+function appendEditHistory_(previousHistory, changeSummary, userEmail) {
+  const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm:ss");
+  const line = timestamp + " - " + userEmail + ": " + String(changeSummary || "").trim();
+  const previous = String(previousHistory || "").trim();
+  const history = previous ? line + "\n" + previous : line;
+  return history.slice(0, 4000);
 }
 
 function buildObservacoes_(payload) {

@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b3f3a">
   <title>ETIQUETAS SAHMT</title>
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./styles.css?v=40">
+  <link rel="stylesheet" href="./styles.css?v=41">
 </head>
 <body>
   <div class="app-shell">
@@ -158,10 +158,14 @@
             <span>Escolher outro dia</span>
             <input id="summary-date" type="date">
           </label>
-          <label class="summary-date-picker">
+          <label class="summary-date-picker summary-search-picker">
             <span>Buscar registro</span>
-            <input id="summary-search" type="search" autocomplete="off" placeholder="Nome, cirurgia, atendimento, tipo ou plantonista">
+            <div class="summary-search-box">
+              <input id="summary-search" type="search" autocomplete="off" placeholder="Nome, cirurgia, atendimento, tipo ou plantonista">
+              <button id="summary-search-button" type="button" aria-label="Buscar registro">Buscar</button>
+            </div>
           </label>
+          <button id="summary-today-button" type="button" class="secondary">Resumo de hoje</button>
         </div>
       </section>
 
@@ -254,6 +258,6 @@
       }
     })();
   </script>
-  <script src="./app.js?v=40" type="module"></script>
+  <script src="./app.js?v=41" type="module"></script>
 </body>
 </html>

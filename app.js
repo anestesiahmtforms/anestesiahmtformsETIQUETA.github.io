@@ -50,6 +50,8 @@ const scriptUrlEl = document.querySelector("#script-url");
 const formEl = document.querySelector("#label-form");
 const summaryDateEl = document.querySelector("#summary-date");
 const summarySearchEl = document.querySelector("#summary-search");
+const summarySearchButtonEl = document.querySelector("#summary-search-button");
+const summaryTodayButtonEl = document.querySelector("#summary-today-button");
 const reportMonthEl = document.querySelector("#report-month");
 const summaryTotalsEl = document.querySelector("#summary-totals");
 const summaryListEl = document.querySelector("#summary-list");
@@ -98,7 +100,14 @@ summaryDateEl.addEventListener("change", () => {
   }
   loadSummary();
 });
-summarySearchEl.addEventListener("input", handleSummarySearchInput);
+summarySearchEl.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    runSummarySearch();
+  }
+});
+summarySearchButtonEl?.addEventListener("click", runSummarySearch);
+summaryTodayButtonEl?.addEventListener("click", resetSummaryToToday);
 reportMonthEl.addEventListener("change", loadMonthlySummary);
 fields.credor.addEventListener("change", syncPlantonistasRequirement);
 editSaveEl?.addEventListener("click", saveEditedRecord);
@@ -1220,11 +1229,24 @@ async function loadSummary(options = {}) {
   }
 }
 
-function handleSummarySearchInput() {
-  window.clearTimeout(handleSummarySearchInput.timer);
-  handleSummarySearchInput.timer = window.setTimeout(() => {
-    loadSummary({ silent: false });
-  }, 450);
+function runSummarySearch() {
+  const query = summarySearchEl?.value.trim() || "";
+  if (!query) {
+    resetSummaryToToday();
+    return;
+  }
+
+  loadSummary({ silent: false });
+}
+
+function resetSummaryToToday() {
+  if (summarySearchEl) {
+    summarySearchEl.value = "";
+  }
+  if (summaryDateEl) {
+    summaryDateEl.value = getTodayISO();
+  }
+  loadSummary({ silent: false, date: getTodayISO() });
 }
 
 async function loadMonthlySummary(options = {}) {
