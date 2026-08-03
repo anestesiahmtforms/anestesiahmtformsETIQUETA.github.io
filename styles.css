@@ -93,16 +93,12 @@ h2 {
   order: 3;
 }
 
-.observations-panel {
+.monthly-panel {
   order: 4;
 }
 
-.monthly-panel {
-  order: 5;
-}
-
 .settings-panel {
-  order: 6;
+  order: 5;
 }
 
 .panel {
@@ -189,6 +185,16 @@ h2 {
 .auth-action {
   width: 100%;
   margin-top: 18px;
+}
+
+.google-signin {
+  display: grid;
+  justify-items: center;
+  margin-top: 16px;
+}
+
+.google-signin[hidden] {
+  display: none;
 }
 
 .camera-stage {
@@ -686,78 +692,6 @@ textarea {
   color: var(--danger);
 }
 
-.observation-list {
-  display: grid;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.observation-result {
-  display: grid;
-  gap: 4px;
-  width: 100%;
-  min-height: 58px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 12px;
-  background: var(--surface-soft);
-  color: var(--ink);
-  cursor: pointer;
-  text-align: left;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.observation-result strong {
-  font-size: 0.94rem;
-  line-height: 1.2;
-}
-
-.observation-result span,
-.observation-result small {
-  color: var(--muted);
-  font-size: 0.8rem;
-  font-weight: 750;
-  line-height: 1.25;
-}
-
-.observation-result:active,
-.observation-result:focus-visible {
-  border-color: rgba(217, 154, 36, 0.74);
-  background: #fffaf0;
-  outline: 0;
-}
-
-.observation-editor {
-  margin-top: 13px;
-  padding: 13px;
-  border: 1px solid rgba(22, 106, 95, 0.2);
-  border-radius: var(--radius);
-  background: rgba(248, 250, 247, 0.86);
-}
-
-.observation-target {
-  margin: 0 0 12px;
-  padding: 10px 12px;
-  border-radius: var(--radius);
-  background: #e7efe9;
-  color: var(--brand);
-  font-size: 0.86rem;
-  font-weight: 900;
-  line-height: 1.3;
-}
-
-.observation-date {
-  margin: 0 0 12px;
-  padding: 9px 11px;
-  border: 1px solid rgba(217, 154, 36, 0.4);
-  border-radius: var(--radius);
-  background: #fffaf0;
-  color: #7a4b00;
-  font-size: 0.84rem;
-  font-weight: 900;
-}
-
 .summary-date-picker {
   display: grid;
   gap: 7px;
@@ -808,6 +742,16 @@ textarea {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface-soft);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.summary-item:focus-visible,
+.summary-item:active {
+  border-color: rgba(217, 154, 36, 0.74);
+  background: #fffaf0;
+  outline: 0;
 }
 
 .summary-item div {
@@ -887,6 +831,17 @@ textarea {
   background: rgba(255, 255, 255, 0.62);
 }
 
+.edit-context {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: #e7efe9;
+  color: var(--brand);
+  font-size: 0.84rem;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
 @media (min-width: 960px) {
   .layout {
     grid-template-columns: 1fr 1fr;
@@ -894,7 +849,6 @@ textarea {
   }
 
   .summary-panel,
-  .observations-panel,
   .settings-panel {
     grid-column: 1 / -1;
   }

@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b3f3a">
   <title>ETIQUETAS SAHMT</title>
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./styles.css?v=37">
+  <link rel="stylesheet" href="./styles.css?v=38">
 </head>
 <body>
   <div class="app-shell">
@@ -152,6 +152,11 @@
           <span>Escolher outro dia</span>
           <input id="summary-date" type="date">
         </label>
+        <label class="summary-date-picker">
+          <span>Buscar registro</span>
+          <input id="summary-search" type="search" autocomplete="off" placeholder="Nome, cirurgia, atendimento, tipo ou plantonista">
+        </label>
+        <p class="hint">Toque duas vezes em um registro para editar. O app mantem quem lancou e registra quem editou.</p>
         <div id="summary-totals" class="summary-totals" hidden></div>
         <div id="summary-list" class="summary-list">
           <p class="empty-state">Nenhum resumo carregado ainda.</p>
@@ -173,38 +178,6 @@
 
         <p id="monthly-status" class="monthly-status">Relatorio mensal ainda nao atualizado.</p>
         <p class="hint">Gera uma tabela mensal em PDF. Em celulares compativeis, o compartilhamento abre o WhatsApp pela tela de envio.</p>
-      </section>
-
-      <section class="panel observations-panel">
-        <div class="section-title">
-          <h2>Observações de Registros lançados</h2>
-        </div>
-
-        <label class="full-width">
-          <span>Mês dos registros</span>
-          <select id="observation-month"></select>
-        </label>
-
-        <label class="full-width">
-          <span>Buscar registro do mês selecionado</span>
-          <input id="observation-search" type="search" autocomplete="off" placeholder="Digite nome, cirurgia ou atendimento">
-        </label>
-
-        <div id="observation-list" class="observation-list"></div>
-
-        <div id="observation-editor" class="observation-editor" hidden>
-          <p id="observation-target" class="observation-target"></p>
-          <p id="observation-date" class="observation-date"></p>
-          <label>
-            <span>Observação para este registro</span>
-            <textarea id="observation-text" rows="4" placeholder="Digite a observação deste registro"></textarea>
-          </label>
-          <div class="actions">
-            <button id="save-observation" type="button">Salvar observação</button>
-            <button id="cancel-observation" type="button" class="secondary">Cancelar</button>
-          </div>
-        </div>
-        <p id="observation-feedback" class="send-feedback" hidden></p>
       </section>
 
       <section class="panel settings-panel" hidden>
@@ -230,6 +203,7 @@
       <h2>ETIQUETAS SAHMT</h2>
       <p id="auth-message">Verificando sua conta Google cadastrada...</p>
       <button id="auth-google" type="button" class="auth-action" hidden>Autorizar este dispositivo</button>
+      <div id="google-signin" class="google-signin"></div>
     </div>
   </div>
 
@@ -240,6 +214,19 @@
       <div class="confirm-actions">
         <button id="confirm-send" type="button">Confirmar envio</button>
         <button id="cancel-send" type="button" class="secondary">Corrigir dados</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="edit-overlay" class="confirm-overlay" hidden>
+    <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="edit-title">
+      <h2 id="edit-title" class="confirm-title-alert">Editar registro</h2>
+      <p id="edit-context" class="edit-context"></p>
+      <div id="edit-summary" class="confirm-summary"></div>
+      <p id="edit-feedback" class="send-feedback" hidden></p>
+      <div class="confirm-actions">
+        <button id="edit-save" type="button">Salvar edicao</button>
+        <button id="edit-cancel" type="button" class="secondary">Cancelar</button>
       </div>
     </div>
   </div>
@@ -265,6 +252,6 @@
       }
     })();
   </script>
-  <script src="./app.js?v=37" type="module"></script>
+  <script src="./app.js?v=38" type="module"></script>
 </body>
 </html>

@@ -79,6 +79,8 @@ const REGISTROS_HEADERS = [
   "Criado por",
   "Observacao atualizada em",
   "Observacao atualizada por",
+  "Editado em",
+  "Editado por",
 ];
 
 const TIPO_OPTIONS = ["Particular", "Complementação", "Unimed", "Outros"];
@@ -133,6 +135,16 @@ function doGet(e) {
       });
     }
 
+    if (action === "search") {
+      const query = String(e.parameter.q || "").trim();
+      const limit = Number(e.parameter.limit || 60);
+      return jsonResponse({
+        ok: true,
+        query,
+        entries: searchEntries_(query, limit),
+      });
+    }
+
     return jsonResponse({
       ok: true,
       message: "ETIQUETAS SAHMT API online.",
@@ -173,6 +185,10 @@ function doPost(e) {
 
     if (action === "updateObservation") {
       return handleUpdateObservation_(payload, user);
+    }
+
+    if (action === "updateRecord") {
+      return handleUpdateRecord_(payload, user);
     }
 
     validatePayload_(payload);
@@ -546,6 +562,7 @@ function formatRegistros_(sheet) {
   sheet.getRange(2, 1, Math.max(sheet.getMaxRows() - 1, 1), 1).setNumberFormat("dd/mm/yyyy");
   sheet.getRange(2, 9, Math.max(sheet.getMaxRows() - 1, 1), 1).setNumberFormat("dd/mm/yyyy hh:mm:ss");
   sheet.getRange(2, 11, Math.max(sheet.getMaxRows() - 1, 1), 1).setNumberFormat("dd/mm/yyyy hh:mm:ss");
+  sheet.getRange(2, 13, Math.max(sheet.getMaxRows() - 1, 1), 1).setNumberFormat("dd/mm/yyyy hh:mm:ss");
   sheet.autoResizeColumns(1, REGISTROS_HEADERS.length);
 }
 
@@ -557,6 +574,7 @@ function applyRowFormats_(sheet, rowNumber) {
   sheet.getRange(rowNumber, 1).setNumberFormat("dd/mm/yyyy");
   sheet.getRange(rowNumber, 9).setNumberFormat("dd/mm/yyyy hh:mm:ss");
   sheet.getRange(rowNumber, 11).setNumberFormat("dd/mm/yyyy hh:mm:ss");
+  sheet.getRange(rowNumber, 13).setNumberFormat("dd/mm/yyyy hh:mm:ss");
 }
 
 function validatePayload_(payload) {
@@ -598,6 +616,44 @@ function handleUpdateObservation_(payload, user) {
   });
 }
 
+function handleUpdateRecord_(payload, user) {
+  const rowNumber = Number(payload.rowNumber || 0);
+  if (!Number.isInteger(rowNumber) || rowNumber < 2) {
+    throw new Error("Registro invalido para editar.");
+  }
+
+  validatePayload_(payload);
+
+  const sheet = getSpreadsheet_().getSheetByName(REGISTROS_SHEET);
+  if (!sheet || rowNumber > sheet.getLastRow()) {
+    throw new Error("Registro nao encontrado na planilha.");
+  }
+
+  sheet.getRange(rowNumber, 1, 1, 8).setValues([[
+    parseIsoDate_(payload.data) || payload.data || "",
+    payload.nomePaciente || "",
+    payload.cirurgia || "",
+    payload.atendimento || "",
+    payload.tipo || "",
+    payload.credor || "",
+    payload.credor === "Caixa" ? "" : (payload.plantonistas || ""),
+    String(payload.observacoes || "").trim(),
+  ]]);
+
+  const editadoEmColumn = REGISTROS_HEADERS.indexOf("Editado em") + 1;
+  const editadoPorColumn = REGISTROS_HEADERS.indexOf("Editado por") + 1;
+  sheet.getRange(rowNumber, editadoEmColumn).setValue(new Date());
+  sheet.getRange(rowNumber, editadoPorColumn).setValue(user.email);
+  applyRowFormats_(sheet, rowNumber);
+
+  return jsonResponse({
+    ok: true,
+    message: "Registro editado com sucesso.",
+    userEmail: user.email,
+    entry: rowToEntry_(sheet.getRange(rowNumber, 1, 1, REGISTROS_HEADERS.length).getDisplayValues()[0], rowNumber),
+  });
+}
+
 function buildObservacoes_(payload) {
   const observacoes = String(payload.observacoes || "").trim();
   const duplicateJustification = String(payload.duplicateJustification || "").trim();
@@ -621,23 +677,42 @@ function findExactDuplicates_(payload) {
 }
 
 function getEntriesByDate_(date) {
-  const sheet = getSpreadsheet_().getSheetByName(REGISTROS_SHEET);
-  if (!sheet) {
-    return [];
-  }
-
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) {
-    return [];
-  }
-
-  const values = sheet.getRange(2, 1, lastRow - 1, REGISTROS_HEADERS.length).getDisplayValues();
-  return values
-    .map((row, index) => rowToEntry_(row, index + 2))
+  return getAllEntries_()
     .filter((entry) => entry.data === date);
 }
 
 function getEntriesByMonth_(month) {
+  return getAllEntries_()
+    .filter((entry) => entry.data.slice(0, 7) === month);
+}
+
+function searchEntries_(query, limit) {
+  const normalizedQuery = normalizeCompare_(query);
+  if (!normalizedQuery) {
+    return [];
+  }
+
+  const maxRows = Math.min(Math.max(Number(limit || 60), 1), 200);
+  return getAllEntries_()
+    .filter(function(entry) {
+      return normalizeCompare_([
+        entry.data,
+        entry.nomePaciente,
+        entry.cirurgia,
+        entry.atendimento,
+        entry.tipo,
+        entry.credor,
+        entry.plantonistas,
+        entry.observacoes,
+        entry.criadoPor,
+        entry.editadoPor,
+      ].join(" ")).indexOf(normalizedQuery) !== -1;
+    })
+    .slice(-maxRows)
+    .reverse();
+}
+
+function getAllEntries_() {
   const sheet = getSpreadsheet_().getSheetByName(REGISTROS_SHEET);
   if (!sheet) {
     return [];
@@ -650,8 +725,7 @@ function getEntriesByMonth_(month) {
 
   const values = sheet.getRange(2, 1, lastRow - 1, REGISTROS_HEADERS.length).getDisplayValues();
   return values
-    .map((row, index) => rowToEntry_(row, index + 2))
-    .filter((entry) => entry.data.slice(0, 7) === month);
+    .map((row, index) => rowToEntry_(row, index + 2));
 }
 
 function rowToEntry_(row, rowNumber) {
@@ -669,6 +743,8 @@ function rowToEntry_(row, rowNumber) {
     criadoPor: row[9],
     observacaoAtualizadaEm: row[10],
     observacaoAtualizadaPor: row[11],
+    editadoEm: row[12] || row[10],
+    editadoPor: row[13] || row[11],
   };
 }
 

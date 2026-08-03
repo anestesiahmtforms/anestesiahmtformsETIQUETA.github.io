@@ -6,7 +6,7 @@ const CONFIG = {
   guideWidthRatio: 0.94,
   guideAspectRatio: 3.35,
   defaultScriptUrl: "https://script.google.com/macros/s/AKfycbzTb2EQ8iM-oB5KnxI26uBvG_ddjDLCD7G0YBov9mgLe7apX89vBECecaUnOHyRTwED/exec",
-  maxObservationResults: 12,
+  maxSearchResults: 60,
 };
 
 const LEGACY_SCRIPT_URLS = new Set([
@@ -25,12 +25,13 @@ const state = {
   metadata: null,
   config: loadConfig(),
   summaryRows: [],
+  summaryMode: "date",
   monthlyRows: [],
   monthlyMonth: "",
-  observationRows: [],
-  selectedObservationRow: null,
+  editingRow: null,
   auth: null,
   authenticated: false,
+  googleButtonRendered: false,
 };
 
 const cameraEl = document.querySelector("#camera");
@@ -43,9 +44,11 @@ const authGateEl = document.querySelector("#auth-gate");
 const authMessageEl = document.querySelector("#auth-message");
 const authUserEl = document.querySelector("#auth-user");
 const authGoogleButtonEl = document.querySelector("#auth-google");
+const googleSigninEl = document.querySelector("#google-signin");
 const scriptUrlEl = document.querySelector("#script-url");
 const formEl = document.querySelector("#label-form");
 const summaryDateEl = document.querySelector("#summary-date");
+const summarySearchEl = document.querySelector("#summary-search");
 const reportMonthEl = document.querySelector("#report-month");
 const summaryTotalsEl = document.querySelector("#summary-totals");
 const summaryListEl = document.querySelector("#summary-list");
@@ -55,16 +58,12 @@ const confirmOverlayEl = document.querySelector("#confirm-overlay");
 const confirmSummaryEl = document.querySelector("#confirm-summary");
 const confirmSendEl = document.querySelector("#confirm-send");
 const cancelSendEl = document.querySelector("#cancel-send");
-const observationMonthEl = document.querySelector("#observation-month");
-const observationSearchEl = document.querySelector("#observation-search");
-const observationListEl = document.querySelector("#observation-list");
-const observationEditorEl = document.querySelector("#observation-editor");
-const observationTargetEl = document.querySelector("#observation-target");
-const observationDateEl = document.querySelector("#observation-date");
-const observationTextEl = document.querySelector("#observation-text");
-const saveObservationEl = document.querySelector("#save-observation");
-const cancelObservationEl = document.querySelector("#cancel-observation");
-const observationFeedbackEl = document.querySelector("#observation-feedback");
+const editOverlayEl = document.querySelector("#edit-overlay");
+const editContextEl = document.querySelector("#edit-context");
+const editSummaryEl = document.querySelector("#edit-summary");
+const editFeedbackEl = document.querySelector("#edit-feedback");
+const editSaveEl = document.querySelector("#edit-save");
+const editCancelEl = document.querySelector("#edit-cancel");
 
 const fields = {
   data: document.querySelector("#data"),
@@ -92,13 +91,17 @@ document.querySelector("#clear-form").addEventListener("click", resetForm);
 document.querySelector("#save-settings").addEventListener("click", saveSettings);
 document.querySelector("#generate-month-pdf-whatsapp").addEventListener("click", generateMonthlyPdfForWhatsApp);
 authGoogleButtonEl?.addEventListener("click", authorizeDeviceWithGoogle);
-summaryDateEl.addEventListener("change", loadSummary);
+summaryDateEl.addEventListener("change", () => {
+  if (summarySearchEl) {
+    summarySearchEl.value = "";
+  }
+  loadSummary();
+});
+summarySearchEl.addEventListener("input", handleSummarySearchInput);
 reportMonthEl.addEventListener("change", loadMonthlySummary);
 fields.credor.addEventListener("change", syncPlantonistasRequirement);
-observationMonthEl.addEventListener("change", loadObservationRecords);
-observationSearchEl.addEventListener("input", renderObservationList);
-saveObservationEl.addEventListener("click", saveSelectedObservation);
-cancelObservationEl.addEventListener("click", clearObservationSelection);
+editSaveEl?.addEventListener("click", saveEditedRecord);
+editCancelEl?.addEventListener("click", closeEditRecord);
 document.addEventListener("click", closePlantonistasPickerOnOutsideClick);
 window.addEventListener("focus", refreshDisplayedSummaries);
 window.addEventListener("pageshow", refreshDisplayedSummaries);
@@ -115,7 +118,6 @@ async function bootstrap() {
   fields.data.value = today;
   summaryDateEl.value = today;
   reportMonthEl.value = today.slice(0, 7);
-  setupObservationMonthOptions(today);
   scriptUrlEl.value = state.config.scriptUrl;
   setupPlantonistasPicker();
   syncPlantonistasRequirement();
@@ -182,6 +184,7 @@ async function authorizeDeviceWithGoogle() {
     clearAuthSession();
     renderAuthStatus();
     showAuthGate("Nao foi possivel autorizar. Confira se o Chrome esta logado em uma conta Google cadastrada e tente novamente.", { showButton: true });
+    renderGoogleSignInButton();
   } finally {
     authGoogleButtonEl.disabled = false;
   }
@@ -192,7 +195,6 @@ async function initializeAuthorizedApp() {
     loadMetadata(),
     loadSummary({ silent: true }),
     loadMonthlySummary({ silent: true }),
-    loadObservationRecords({ silent: true }),
   ]);
 }
 
@@ -226,7 +228,20 @@ function requestGoogleCredential() {
         settled = true;
         reject(new Error("Conta Google nao identificada automaticamente."));
       }
-    }, 12000);
+    }, 60000);
+
+    const finish = (credential) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      window.clearTimeout(timeout);
+      if (credential) {
+        resolve(credential);
+      } else {
+        reject(new Error("Conta Google nao autorizada."));
+      }
+    };
 
     window.google.accounts.id.initialize({
       client_id: CONFIG.googleClientId,
@@ -234,30 +249,41 @@ function requestGoogleCredential() {
       cancel_on_tap_outside: false,
       itp_support: true,
       callback(response) {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        window.clearTimeout(timeout);
-        if (response?.credential) {
-          resolve(response.credential);
-        } else {
-          reject(new Error("Conta Google nao autorizada."));
-        }
+        finish(response?.credential || "");
       },
     });
+
+    renderGoogleSignInButton();
 
     window.google.accounts.id.prompt((notification) => {
       if (settled) {
         return;
       }
-      if (notification.isDismissedMoment?.()) {
-        settled = true;
-        window.clearTimeout(timeout);
-        reject(new Error("Conta Google nao identificada automaticamente."));
+      if (notification.isDismissedMoment?.() || notification.isSkippedMoment?.() || notification.isNotDisplayed?.()) {
+        authGoogleButtonEl.hidden = true;
+        if (googleSigninEl) {
+          googleSigninEl.hidden = false;
+        }
       }
     });
   });
+}
+
+function renderGoogleSignInButton() {
+  if (!googleSigninEl || !window.google?.accounts?.id || state.googleButtonRendered) {
+    return;
+  }
+
+  googleSigninEl.innerHTML = "";
+  googleSigninEl.hidden = false;
+  window.google.accounts.id.renderButton(googleSigninEl, {
+    theme: "filled_blue",
+    size: "large",
+    shape: "pill",
+    text: "signin_with",
+    width: Math.min(360, Math.max(260, googleSigninEl.clientWidth || 320)),
+  });
+  state.googleButtonRendered = true;
 }
 
 function applyAuthenticatedUser(auth) {
@@ -387,6 +413,9 @@ function showAuthGate(message, options = {}) {
   if (authGoogleButtonEl) {
     authGoogleButtonEl.hidden = !options.showButton;
   }
+  if (googleSigninEl) {
+    googleSigninEl.hidden = true;
+  }
   authGateEl?.removeAttribute("hidden");
   document.body.classList.add("auth-locked");
 }
@@ -394,6 +423,9 @@ function showAuthGate(message, options = {}) {
 function hideAuthGate() {
   if (authGoogleButtonEl) {
     authGoogleButtonEl.hidden = true;
+  }
+  if (googleSigninEl) {
+    googleSigninEl.hidden = true;
   }
   authGateEl?.setAttribute("hidden", "");
   document.body.classList.remove("auth-locked");
@@ -804,7 +836,6 @@ async function sendToSheet() {
     await Promise.all([
       loadSummary({ silent: true }),
       loadMonthlySummary({ silent: true }),
-      loadObservationRecords({ silent: true }),
     ]);
     setSendFeedback("Dados enviados com sucesso!", "success");
     setStatus("Dados enviados com sucesso!", "success");
@@ -1089,13 +1120,10 @@ async function refreshDisplayedSummaries() {
     return;
   }
 
-  const refreshTasks = [loadSummary({ silent: true })];
-  if (observationEditorEl.hidden) {
-    refreshTasks.push(loadMonthlySummary({ silent: true }));
-    refreshTasks.push(loadObservationRecords({ silent: true }));
-  }
-
-  await Promise.all(refreshTasks);
+  await Promise.all([
+    loadSummary({ silent: true }),
+    loadMonthlySummary({ silent: true }),
+  ]);
 }
 
 async function loadSummary(options = {}) {
@@ -1106,9 +1134,18 @@ async function loadSummary(options = {}) {
   }
 
   try {
+    const query = summarySearchEl?.value.trim() || "";
     const url = new URL(state.config.scriptUrl);
-    url.searchParams.set("action", "summary");
-    url.searchParams.set("date", options.date || summaryDateEl.value || getTodayISO());
+    if (query) {
+      url.searchParams.set("action", "search");
+      url.searchParams.set("q", query);
+      url.searchParams.set("limit", String(CONFIG.maxSearchResults));
+      state.summaryMode = "search";
+    } else {
+      url.searchParams.set("action", "summary");
+      url.searchParams.set("date", options.date || summaryDateEl.value || getTodayISO());
+      state.summaryMode = "date";
+    }
     addAuthToUrl(url);
     const response = await fetch(url.toString(), { method: "GET" });
     const result = await response.json();
@@ -1118,9 +1155,12 @@ async function loadSummary(options = {}) {
     }
 
     state.summaryRows = result.entries || [];
-    renderSummary(state.summaryRows);
+    renderSummary(
+      state.summaryRows,
+      query ? "Nenhum registro encontrado para esta busca." : "Nenhuma entrada encontrada nesta data."
+    );
     if (!options.silent) {
-      setStatus("Resumo carregado.", "success");
+      setStatus(query ? "Busca carregada." : "Resumo carregado.", "success");
     }
   } catch (error) {
     state.summaryRows = [];
@@ -1129,6 +1169,13 @@ async function loadSummary(options = {}) {
       setStatus(`Falha ao carregar resumo: ${error.message}`, "error");
     }
   }
+}
+
+function handleSummarySearchInput() {
+  window.clearTimeout(handleSummarySearchInput.timer);
+  handleSummarySearchInput.timer = window.setTimeout(() => {
+    loadSummary({ silent: false });
+  }, 450);
 }
 
 async function loadMonthlySummary(options = {}) {
@@ -1167,172 +1214,6 @@ function renderMonthlyStatus(message, tone = "neutral") {
   monthlyStatusEl.dataset.tone = tone;
 }
 
-function setupObservationMonthOptions(todayIso) {
-  const [year, month] = todayIso.split("-").map(Number);
-  const options = [];
-
-  for (let offset = 0; offset < 3; offset += 1) {
-    const date = new Date(year, month - 1 - offset, 1);
-    const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-    options.push(`<option value="${value}">${formatMonth(value)}</option>`);
-  }
-
-  observationMonthEl.innerHTML = options.join("");
-}
-
-async function loadObservationRecords(options = {}) {
-  if (!state.config.scriptUrl) {
-    state.observationRows = [];
-    renderObservationList("Configure a URL do Apps Script para carregar os registros.");
-    return;
-  }
-
-  try {
-    const month = observationMonthEl.value || getTodayISO().slice(0, 7);
-    state.observationRows = await loadMonthlyEntries(month);
-    renderObservationList();
-    if (!options.silent) {
-      setObservationFeedback(`Registros de ${formatMonth(month)} carregados.`, "success");
-    }
-  } catch (error) {
-    state.observationRows = [];
-    renderObservationList(`Nao foi possivel carregar os registros: ${error.message}`);
-    if (!options.silent) {
-      setObservationFeedback(`Falha ao carregar registros: ${error.message}`, "error");
-    }
-  }
-}
-
-function renderObservationList(customEmptyMessage = "") {
-  clearObservationSelection({ keepFeedback: true });
-
-  const query = normalizeSearch(observationSearchEl.value);
-  const rows = state.observationRows.filter((row) => (
-    !query
-    || normalizeSearch([
-      row.data,
-      row.nomePaciente,
-      row.cirurgia,
-      row.atendimento,
-      row.tipo,
-      row.credor,
-      row.plantonistas,
-      row.observacoes,
-    ].join(" ")).includes(query)
-  )).slice(0, CONFIG.maxObservationResults);
-
-  if (!state.observationRows.length) {
-    observationListEl.innerHTML = `<p class="empty-state">${escapeHtml(customEmptyMessage || "Nenhum registro carregado para o mês selecionado.")}</p>`;
-    return;
-  }
-
-  if (!query) {
-    observationListEl.innerHTML = "";
-    return;
-  }
-
-  if (!rows.length) {
-    observationListEl.innerHTML = `<p class="empty-state">Nenhum registro encontrado para esta busca.</p>`;
-    return;
-  }
-
-  observationListEl.innerHTML = rows.map((row) => `
-    <button class="observation-result" type="button" data-row-number="${escapeHtml(row.rowNumber || "")}">
-      <strong>${escapeHtml(row.nomePaciente || "")}</strong>
-      <span>Data ${escapeHtml(formatDate(row.data || ""))} | Cirurgia ${escapeHtml(row.cirurgia || "")} | Atendimento ${escapeHtml(row.atendimento || "")}</span>
-      <small>Tipo: ${escapeHtml(row.tipo || "-")} | Credor: ${escapeHtml(row.credor || "-")} | Plantonista(s): ${escapeHtml(row.plantonistas || "Nao necessario")}</small>
-      <small>Observação atual: ${escapeHtml(row.observacoes || "Sem observação")}</small>
-      <small>Observação feita por: ${escapeHtml(row.observacaoAtualizadaPor || "Sem observação registrada")}</small>
-    </button>
-  `).join("");
-
-  observationListEl.querySelectorAll(".observation-result").forEach((button) => {
-    button.addEventListener("click", () => selectObservationRow(button.dataset.rowNumber));
-    button.addEventListener("touchend", (event) => {
-      event.preventDefault();
-      selectObservationRow(button.dataset.rowNumber);
-    }, { passive: false });
-  });
-}
-
-function selectObservationRow(rowNumber) {
-  const selected = state.observationRows.find((row) => String(row.rowNumber) === String(rowNumber));
-  if (!selected) {
-    return;
-  }
-
-  state.selectedObservationRow = selected;
-  observationEditorEl.hidden = false;
-  observationTextEl.value = extractObservationBody(selected.observacoes || "");
-  observationTargetEl.textContent = `${formatDate(selected.data || "")} | ${selected.nomePaciente || ""} | Cirurgia ${selected.cirurgia || ""} | Atendimento ${selected.atendimento || ""} | ${selected.tipo || ""} | ${selected.credor || ""} | Plantonista(s): ${selected.plantonistas || "Nao necessario"} | Lancado por: ${selected.criadoPor || "Nao informado"} | Observacao feita por: ${selected.observacaoAtualizadaPor || "Sem observacao registrada"}`;
-  observationDateEl.textContent = `Data desta observação: ${formatDate(getTodayISO())}`;
-  setObservationFeedback("", "neutral");
-}
-
-function clearObservationSelection(options = {}) {
-  state.selectedObservationRow = null;
-  observationEditorEl.hidden = true;
-  observationTargetEl.textContent = "";
-  observationDateEl.textContent = "";
-  observationTextEl.value = "";
-  if (!options.keepFeedback) {
-    setObservationFeedback("", "neutral");
-  }
-}
-
-async function saveSelectedObservation() {
-  if (!state.selectedObservationRow) {
-    setObservationFeedback("Escolha primeiro um registro do mês.", "error");
-    return;
-  }
-
-  const observationBody = observationTextEl.value.trim();
-  const observacoes = observationBody ? `${formatDate(getTodayISO())} - ${observationBody}` : "";
-  toggleBusy(true);
-  setObservationFeedback("Salvando observação...", "neutral");
-
-  try {
-    const response = await fetch(state.config.scriptUrl, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(withAuthPayload({
-        action: "updateObservation",
-        rowNumber: state.selectedObservationRow.rowNumber,
-        observacoes,
-      })),
-    });
-    const result = await response.json();
-
-    if (!response.ok || result.ok !== true) {
-      throw new Error(result.message || "Falha ao salvar observação.");
-    }
-
-    observationSearchEl.value = "";
-    observationListEl.innerHTML = "";
-    clearObservationSelection({ keepFeedback: true });
-    await Promise.all([
-      loadSummary({ silent: true }),
-      loadMonthlySummary({ silent: true }),
-      loadObservationRecords({ silent: true }),
-    ]);
-    setObservationFeedback("Observação enviada com sucesso!", "success");
-  } catch (error) {
-    setObservationFeedback(`Falha ao salvar observação: ${error.message}`, "error");
-  } finally {
-    toggleBusy(false);
-  }
-}
-
-function setObservationFeedback(message, tone = "neutral") {
-  observationFeedbackEl.textContent = message;
-  observationFeedbackEl.dataset.tone = tone;
-  observationFeedbackEl.hidden = !message;
-}
-
-function extractObservationBody(value) {
-  return String(value || "").replace(/^\d{2}\/\d{2}\/\d{4}\s*-\s*/, "").trim();
-}
-
 function renderSummary(rows, emptyMessage = "Nenhuma entrada encontrada nesta data.") {
   summaryTotalsEl.innerHTML = "";
 
@@ -1344,12 +1225,13 @@ function renderSummary(rows, emptyMessage = "Nenhuma entrada encontrada nesta da
   summaryListEl.innerHTML = rows.map((row, index) => {
     const alertClass = isAlertType(row.tipo) ? " alert-row" : "";
     return `
-      <article class="summary-item${alertClass}">
+      <article class="summary-item${alertClass}" data-row-number="${escapeHtml(row.rowNumber || "")}" tabindex="0" title="Toque duas vezes para editar">
         <div class="summary-index">${index + 1}</div>
         <div class="summary-main">
           <strong>${escapeHtml(row.nomePaciente || "")}</strong>
-          <span>Cirurgia ${escapeHtml(row.cirurgia || "")} | Atendimento ${escapeHtml(row.atendimento || "")}</span>
+          <span>Data ${escapeHtml(formatDate(row.data || ""))} | Cirurgia ${escapeHtml(row.cirurgia || "")} | Atendimento ${escapeHtml(row.atendimento || "")}</span>
           <small>Responsavel: ${escapeHtml(row.criadoPor || "Nao informado")}</small>
+          <small>Editado por: ${escapeHtml(row.editadoPor || "Sem edicao registrada")}</small>
         </div>
         <div class="summary-type">
           <b>${escapeHtml(row.tipo || "")}</b>
@@ -1359,11 +1241,170 @@ function renderSummary(rows, emptyMessage = "Nenhuma entrada encontrada nesta da
           <small>Plantonista(s)</small>
           <b>${escapeHtml(row.plantonistas || "-")}</b>
           <span>${escapeHtml(row.observacoes || "")}</span>
-          <small>Observacao feita por: ${escapeHtml(row.observacaoAtualizadaPor || "Sem observacao registrada")}</small>
+          <small>Ultima edicao: ${escapeHtml(row.editadoEm || "Sem edicao")}</small>
         </div>
       </article>
     `;
   }).join("");
+
+  summaryListEl.querySelectorAll(".summary-item").forEach((item) => {
+    let lastTapAt = 0;
+    const open = () => openEditRecord(item.dataset.rowNumber);
+    item.addEventListener("dblclick", open);
+    item.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        open();
+      }
+    });
+    item.addEventListener("touchend", (event) => {
+      const now = Date.now();
+      if (now - lastTapAt < 450) {
+        event.preventDefault();
+        open();
+      }
+      lastTapAt = now;
+    }, { passive: false });
+  });
+}
+
+function openEditRecord(rowNumber) {
+  const row = state.summaryRows.find((entry) => String(entry.rowNumber) === String(rowNumber));
+  if (!row || !editOverlayEl || !editSummaryEl) {
+    return;
+  }
+
+  state.editingRow = { ...row };
+  renderEditRecordFields();
+  setEditFeedback("", "neutral");
+  editOverlayEl.hidden = false;
+  editContextEl.textContent = `Lancado por: ${row.criadoPor || "Nao informado"} | Criado em: ${row.criadoEm || "Nao informado"}`;
+}
+
+function renderEditRecordFields() {
+  const row = state.editingRow || {};
+  editSummaryEl.innerHTML = `
+    <div class="confirm-edit-grid">
+      <label>
+        <span>Data</span>
+        <input id="edit-data" type="date" value="${escapeHtml(row.data || "")}" required>
+      </label>
+      <label class="full-width">
+        <span>Nome do Paciente</span>
+        <input id="edit-nomePaciente" type="text" value="${escapeHtml(row.nomePaciente || "")}" required>
+      </label>
+      <label>
+        <span>Cirurgia</span>
+        <input id="edit-cirurgia" inputmode="numeric" value="${escapeHtml(row.cirurgia || "")}" required>
+      </label>
+      <label>
+        <span>Atendimento</span>
+        <input id="edit-atendimento" inputmode="numeric" value="${escapeHtml(row.atendimento || "")}" required>
+      </label>
+      <label>
+        <span>Tipo</span>
+        <select id="edit-tipo" required>
+          ${renderOption("", "Selecione", row.tipo)}
+          ${renderOption("Particular", "Particular", row.tipo)}
+          ${renderOption("Complementação", "Complementação", row.tipo)}
+          ${renderOption("Unimed", "Unimed", row.tipo)}
+          ${renderOption("Outros", "Outros", row.tipo)}
+        </select>
+      </label>
+      <label>
+        <span>Credor</span>
+        <select id="edit-credor" required>
+          ${renderOption("", "Selecione", row.credor)}
+          ${renderOption("Caixa", "Caixa", row.credor)}
+          ${renderOption("Plantão", "Plantão", row.credor)}
+          ${renderOption("Plantão/Caixa", "Plantão/Caixa", row.credor)}
+        </select>
+      </label>
+      <label class="full-width">
+        <span>Plantonista(s)</span>
+        <input id="edit-plantonistas" type="text" value="${escapeHtml(row.plantonistas || "")}" placeholder="Nao necessario quando Credor for Caixa">
+      </label>
+      <label class="full-width">
+        <span>Observacoes</span>
+        <textarea id="edit-observacoes" rows="3">${escapeHtml(row.observacoes || "")}</textarea>
+      </label>
+    </div>
+  `;
+}
+
+function collectEditPayload() {
+  const credor = editSummaryEl.querySelector("#edit-credor")?.value.trim() || "";
+  return {
+    rowNumber: state.editingRow?.rowNumber || "",
+    data: editSummaryEl.querySelector("#edit-data")?.value || "",
+    nomePaciente: editSummaryEl.querySelector("#edit-nomePaciente")?.value.trim() || "",
+    cirurgia: cleanDigits(editSummaryEl.querySelector("#edit-cirurgia")?.value || ""),
+    atendimento: cleanDigits(editSummaryEl.querySelector("#edit-atendimento")?.value || ""),
+    tipo: editSummaryEl.querySelector("#edit-tipo")?.value.trim() || "",
+    credor,
+    plantonistas: credor === CREDOR_CAIXA ? "" : (editSummaryEl.querySelector("#edit-plantonistas")?.value.trim() || ""),
+    observacoes: editSummaryEl.querySelector("#edit-observacoes")?.value.trim() || "",
+  };
+}
+
+async function saveEditedRecord() {
+  if (!state.editingRow) {
+    return;
+  }
+
+  const payload = collectEditPayload();
+  const missing = getMissingRequiredFields(payload);
+  if (missing.length) {
+    setEditFeedback("Corrija os campos obrigatorios antes de salvar.", "error");
+    return;
+  }
+
+  toggleBusy(true);
+  setEditFeedback("Salvando edicao...", "neutral");
+  try {
+    const response = await fetch(state.config.scriptUrl, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(withAuthPayload({
+        action: "updateRecord",
+        ...payload,
+      })),
+    });
+    const result = await response.json();
+    if (!response.ok || result.ok !== true) {
+      throw new Error(result.message || "Falha ao editar registro.");
+    }
+
+    closeEditRecord();
+    if (payload.data) {
+      summaryDateEl.value = payload.data;
+    }
+    await Promise.all([
+      loadSummary({ silent: true }),
+      loadMonthlySummary({ silent: true }),
+    ]);
+    setStatus("Registro editado com sucesso!", "success");
+  } catch (error) {
+    setEditFeedback(`Falha ao editar registro: ${error.message}`, "error");
+  } finally {
+    toggleBusy(false);
+  }
+}
+
+function closeEditRecord() {
+  state.editingRow = null;
+  if (editOverlayEl) {
+    editOverlayEl.hidden = true;
+  }
+  setEditFeedback("", "neutral");
+}
+
+function setEditFeedback(message, tone = "neutral") {
+  if (!editFeedbackEl) {
+    return;
+  }
+  editFeedbackEl.textContent = message;
+  editFeedbackEl.dataset.tone = tone;
+  editFeedbackEl.hidden = !message;
 }
 
 async function loadMonthlyEntries(month) {
@@ -1529,7 +1570,7 @@ function buildMonthlyPdf(rows, month) {
     row.credor || "",
     row.plantonistas || "-",
     row.criadoPor || "",
-    row.observacaoAtualizadaPor || "",
+    row.editadoPor || "",
     row.observacoes || "",
   ]);
 
@@ -1543,7 +1584,7 @@ function buildMonthlyPdf(rows, month) {
 
   doc.autoTable({
     startY: 34,
-    head: [["#", "Data", "Nome do Paciente", "Cirurgia", "Atendimento", "Tipo", "Credor", "Plantonista(s)", "Responsavel", "Obs. por", "Observacoes"]],
+    head: [["#", "Data", "Nome do Paciente", "Cirurgia", "Atendimento", "Tipo", "Credor", "Plantonista(s)", "Responsavel", "Editado por", "Observacoes"]],
     body: tableRows,
     theme: "grid",
     styles: { fontSize: 7.6, cellPadding: 2, overflow: "linebreak", valign: "middle" },
@@ -1611,7 +1652,6 @@ function resetForm(options = {}) {
   clearPlantonistasSelection();
   syncPlantonistasRequirement();
   setSendFeedback("", "neutral");
-  clearObservationSelection({ keepFeedback: true });
 
   if (!options.keepImage) {
     clearImage();
