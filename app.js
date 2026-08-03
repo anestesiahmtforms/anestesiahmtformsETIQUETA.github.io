@@ -32,6 +32,7 @@ const state = {
   auth: null,
   authenticated: false,
   googleButtonRendered: false,
+  googleAuthInProgress: false,
 };
 
 const cameraEl = document.querySelector("#camera");
@@ -146,7 +147,7 @@ async function authenticateUser() {
   state.auth = null;
   state.authenticated = false;
   renderAuthStatus();
-  showAuthGate("Dispositivo ainda nao autorizado. Toque abaixo uma vez para autorizar com sua conta Google cadastrada.", { showButton: true });
+  await prepareGoogleLoginSurface("Escolha sua conta Google cadastrada para entrar.");
   return false;
 }
 
@@ -157,13 +158,53 @@ async function authorizeDeviceWithGoogle() {
   }
 
   authGoogleButtonEl.disabled = true;
-  showAuthGate("Abrindo autorizacao Google...", { showButton: true });
+  await prepareGoogleLoginSurface("Escolha sua conta Google cadastrada para autorizar este dispositivo.");
+  authGoogleButtonEl.disabled = false;
+}
+
+async function prepareGoogleLoginSurface(message) {
+  showAuthGate(message, { showButton: false });
 
   try {
     await waitForGoogleIdentity();
-    const credential = await requestGoogleCredential();
-    const authResult = await validateGoogleCredential(credential);
+    initializeGoogleIdentity(handleGoogleCredentialResponse);
+    renderGoogleSignInButton();
+    window.google.accounts.id.prompt();
+  } catch (error) {
+    console.warn("Login Google indisponivel:", error);
+    showAuthGate("Nao foi possivel abrir o login Google automaticamente. Toque abaixo para tentar novamente.", { showButton: true });
+  }
+}
 
+function initializeGoogleIdentity(callback) {
+  window.google.accounts.id.initialize({
+    client_id: CONFIG.googleClientId,
+    auto_select: true,
+    cancel_on_tap_outside: false,
+    itp_support: true,
+    callback(response) {
+      callback(response?.credential || "");
+    },
+  });
+}
+
+async function handleGoogleCredentialResponse(credential) {
+  if (state.googleAuthInProgress) {
+    return;
+  }
+
+  state.googleAuthInProgress = true;
+  if (authGoogleButtonEl) {
+    authGoogleButtonEl.disabled = true;
+  }
+  showAuthGate("Validando conta Google cadastrada...", { showButton: false });
+
+  try {
+    if (!credential) {
+      throw new Error("Conta Google nao autorizada.");
+    }
+
+    const authResult = await validateGoogleCredential(credential);
     applyAuthenticatedUser({
       token: credential,
       email: String(authResult.email || "").toLowerCase(),
@@ -183,10 +224,13 @@ async function authorizeDeviceWithGoogle() {
     state.authenticated = false;
     clearAuthSession();
     renderAuthStatus();
-    showAuthGate("Nao foi possivel autorizar. Confira se o Chrome esta logado em uma conta Google cadastrada e tente novamente.", { showButton: true });
+    showAuthGate("Nao foi possivel autorizar. Confira se o navegador esta logado em uma conta Google cadastrada e tente novamente.", { showButton: true });
     renderGoogleSignInButton();
   } finally {
-    authGoogleButtonEl.disabled = false;
+    state.googleAuthInProgress = false;
+    if (authGoogleButtonEl) {
+      authGoogleButtonEl.disabled = false;
+    }
   }
 }
 
@@ -270,7 +314,12 @@ function requestGoogleCredential() {
 }
 
 function renderGoogleSignInButton() {
-  if (!googleSigninEl || !window.google?.accounts?.id || state.googleButtonRendered) {
+  if (!googleSigninEl || !window.google?.accounts?.id) {
+    return;
+  }
+
+  if (state.googleButtonRendered) {
+    googleSigninEl.hidden = false;
     return;
   }
 

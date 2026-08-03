@@ -29,16 +29,16 @@ Atendimento: 7525561
 - `Plantonista(s)`: caixa de selecao multipla. Quando `Credor` for `Caixa`, o campo fica desativado.
 Antes do envio, o app mostra uma confirmacao para conferencia dos dados.
 
-## Observacoes posteriores
+## Busca e edicao de registros
 
-O campo `Observacoes` nao aparece mais na entrada principal. Para sinalizar um registro depois do envio:
+O app nao tem mais a caixa separada `Observacoes de Registros lancados`. As correcoes posteriores agora acontecem pelo `Resumo do dia`:
 
-1. Abaixo de `Resumo do dia`, selecione o mes em `Observacoes de Registros lancados`.
-2. Busque por nome, cirurgia ou atendimento.
-3. Toque no registro desejado.
-4. Digite a observacao e toque em `Salvar observacao`.
+1. Use `Escolher outro dia` para listar uma data especifica, ou `Buscar registro` para pesquisar em qualquer periodo.
+2. Toque duas vezes no registro desejado.
+3. Corrija os campos no painel `Editar registro`.
+4. Toque em `Salvar edicao`.
 
-A observacao e gravada somente naquele registro especifico da aba `ETIQUETA`, junto com a data e o usuario que fez a alteracao.
+O app mantem quem fez o primeiro lancamento e grava tambem quem fez a ultima edicao.
 
 ## Acesso restrito
 
