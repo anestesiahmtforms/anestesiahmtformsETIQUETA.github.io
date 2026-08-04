@@ -51,6 +51,7 @@ const homeReturnEl = document.querySelector("#home-return");
 const scriptUrlEl = document.querySelector("#script-url");
 const formEl = document.querySelector("#label-form");
 const summaryDateEl = document.querySelector("#summary-date");
+const summaryDateButtonEl = document.querySelector("#summary-date-button");
 const summarySearchEl = document.querySelector("#summary-search");
 const summarySearchButtonEl = document.querySelector("#summary-search-button");
 const summaryTodayButtonEl = document.querySelector("#summary-today-button");
@@ -102,8 +103,8 @@ summaryDateEl.addEventListener("change", () => {
   if (summarySearchEl) {
     summarySearchEl.value = "";
   }
-  loadSummary();
 });
+summaryDateButtonEl?.addEventListener("click", runSummaryDateSearch);
 summarySearchEl.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     event.preventDefault();
@@ -174,18 +175,19 @@ async function authenticateUser() {
   showAuthGate("Verificando se este dispositivo ja esta autorizado...", { showButton: false });
   renderAuthStatus();
 
-  const cachedAuth = await restoreTrustedDeviceSession();
+  const cachedAuth = getStoredTrustedDeviceSession();
   if (cachedAuth) {
     applyAuthenticatedUser(cachedAuth);
     hideAuthGate();
     renderAuthStatus();
+    validateTrustedDeviceInBackground(cachedAuth);
     return true;
   }
 
   state.auth = null;
   state.authenticated = false;
   renderAuthStatus();
-  await prepareGoogleLoginSurface("Escolha sua conta Google cadastrada para entrar.");
+  await prepareGoogleLoginSurface("Se sua conta Google cadastrada ja estiver logada, o acesso sera liberado automaticamente. Se precisar entrar, toque no botao abaixo.", { showButton: true });
   return false;
 }
 
@@ -196,12 +198,12 @@ async function authorizeDeviceWithGoogle() {
   }
 
   authGoogleButtonEl.disabled = true;
-  await prepareGoogleLoginSurface("Escolha sua conta Google cadastrada para autorizar este dispositivo.");
+  await prepareGoogleLoginSurface("Escolha sua conta Google cadastrada para autorizar este dispositivo.", { showButton: true });
   authGoogleButtonEl.disabled = false;
 }
 
-async function prepareGoogleLoginSurface(message) {
-  showAuthGate(message, { showButton: false });
+async function prepareGoogleLoginSurface(message, options = {}) {
+  showAuthGate(message, { showButton: options.showButton !== false });
 
   try {
     await waitForGoogleIdentity();
@@ -342,7 +344,7 @@ function requestGoogleCredential() {
         return;
       }
       if (notification.isDismissedMoment?.() || notification.isSkippedMoment?.() || notification.isNotDisplayed?.()) {
-        authGoogleButtonEl.hidden = true;
+        authGoogleButtonEl.hidden = false;
         if (googleSigninEl) {
           googleSigninEl.hidden = false;
         }
@@ -399,6 +401,21 @@ function persistTrustedDeviceSession() {
 
 async function restoreTrustedDeviceSession() {
   try {
+    const saved = getStoredTrustedDeviceSession();
+    if (!saved) {
+      return null;
+    }
+
+    return await validateTrustedDevice(saved);
+  } catch (error) {
+    console.warn("Dispositivo confiavel nao validado:", error);
+    clearAuthSession();
+    return null;
+  }
+}
+
+function getStoredTrustedDeviceSession() {
+  try {
     const saved = JSON.parse(localStorage.getItem(CONFIG.authSessionKey) || "null");
     if (!saved?.deviceToken || !saved?.email || !saved?.trustedDeviceExpiresAt) {
       return null;
@@ -409,11 +426,27 @@ async function restoreTrustedDeviceSession() {
       return null;
     }
 
-    return await validateTrustedDevice(saved);
-  } catch (error) {
-    console.warn("Dispositivo confiavel nao validado:", error);
+    return saved;
+  } catch {
     clearAuthSession();
     return null;
+  }
+}
+
+async function validateTrustedDeviceInBackground(savedAuth) {
+  try {
+    const validated = await validateTrustedDevice(savedAuth);
+    applyAuthenticatedUser(validated);
+    persistTrustedDeviceSession();
+    renderAuthStatus();
+  } catch (error) {
+    console.warn("Dispositivo confiavel expirou ou foi recusado:", error);
+    state.auth = null;
+    state.authenticated = false;
+    clearAuthSession();
+    renderAuthStatus();
+    showAuthGate("Voce precisa estar logado em sua conta Google cadastrada para entrar.", { showButton: true });
+    prepareGoogleLoginSurface("Toque abaixo para autorizar novamente este dispositivo.", { showButton: true });
   }
 }
 
@@ -1275,6 +1308,13 @@ function runSummarySearch() {
   loadSummary({ silent: false });
 }
 
+function runSummaryDateSearch() {
+  if (summarySearchEl) {
+    summarySearchEl.value = "";
+  }
+  loadSummary({ silent: false, date: summaryDateEl?.value || getTodayISO() });
+}
+
 function resetSummaryToToday() {
   if (summarySearchEl) {
     summarySearchEl.value = "";
@@ -1332,8 +1372,8 @@ function renderSummary(rows, emptyMessage = "Nenhuma entrada encontrada nesta da
   summaryListEl.innerHTML = rows.map((row, index) => {
     const alertClass = isAlertType(row.tipo) ? " alert-row" : "";
     const editedClass = row.editadoEm || row.editadoPor || row.resumoEdicao || row.observacaoAtualizadaEm || row.observacaoAtualizadaPor ? " edited-row" : "";
-    const observationBlock = renderSummaryObservationBlock(row);
     const editBlock = renderSummaryEditBlock(row);
+    const observationBlock = renderSummaryObservationBlock(row);
     return `
       <article class="summary-item${alertClass}${editedClass}" data-row-number="${escapeHtml(row.rowNumber || "")}" tabindex="0" title="Toque duas vezes para editar">
         <div class="summary-index">${index + 1}</div>
@@ -1350,8 +1390,8 @@ function renderSummary(rows, emptyMessage = "Nenhuma entrada encontrada nesta da
           <small>Plantonista(s)</small>
           <b>${escapeHtml(row.plantonistas || "-")}</b>
         </div>
-        ${observationBlock}
         ${editBlock}
+        ${observationBlock}
       </article>
     `;
   }).join("");
@@ -1385,9 +1425,11 @@ function renderSummaryObservationBlock(row) {
   return `
     <div class="summary-history-block summary-observation-block">
       <strong>Observacao</strong>
-      <span>${escapeHtml(row.observacoes || "Sem texto de observacao.")}</span>
-      <small>Atualizada em: ${escapeHtml(row.observacaoAtualizadaEm || "Sem data registrada")}</small>
-      <small>Responsavel: ${escapeHtml(row.observacaoAtualizadaPor || "Sem responsavel registrado")}</small>
+      <span>${escapeHtml(composeHistoryLine(
+        row.observacaoAtualizadaEm || "Sem data registrada",
+        row.observacaoAtualizadaPor || "Sem responsavel registrado",
+        row.observacoes || "Sem texto de observacao."
+      ))}</span>
     </div>
   `;
 }
@@ -1401,11 +1443,30 @@ function renderSummaryEditBlock(row) {
   return `
     <div class="summary-history-block summary-edit-block">
       <strong>Edicao de Registro</strong>
-      <small>Ultima edicao: ${escapeHtml(row.editadoEm || "Sem data registrada")}</small>
-      <small>Responsavel: ${escapeHtml(row.editadoPor || "Sem responsavel registrado")}</small>
-      ${row.resumoEdicao ? `<span class="summary-edit-note">Alterado: ${escapeHtml(row.resumoEdicao)}</span>` : ""}
+      ${renderEditHistoryLines(row)}
     </div>
   `;
+}
+
+function renderEditHistoryLines(row) {
+  const history = String(row.resumoEdicao || "").trim();
+  if (history) {
+    return history
+      .split(/\n+/)
+      .filter(Boolean)
+      .map((line) => `<span class="summary-edit-note">${escapeHtml(line)}</span>`)
+      .join("");
+  }
+
+  return `<span class="summary-edit-note">${escapeHtml(composeHistoryLine(
+    row.editadoEm || "Sem data registrada",
+    row.editadoPor || "Sem responsavel registrado",
+    "Registro editado."
+  ))}</span>`;
+}
+
+function composeHistoryLine(dateTime, responsible, detail) {
+  return `${dateTime} - ${responsible}: ${detail}`;
 }
 
 function openEditRecord(rowNumber) {
