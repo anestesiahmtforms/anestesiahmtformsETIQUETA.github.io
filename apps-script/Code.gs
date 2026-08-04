@@ -6,7 +6,7 @@ const OPENAI_MODEL = "gpt-5.2";
 const OPENAI_API_KEY_PROPERTY = "OPENAI_API_KEY";
 const GOOGLE_CLIENT_ID = "908976987584-o59p0obmvq013lg3t9726itf06e15v2c.apps.googleusercontent.com";
 const TRUSTED_DEVICES_PROPERTY = "TRUSTED_DEVICES_JSON";
-const TRUSTED_DEVICE_DAYS = 30;
+const TRUSTED_DEVICE_DAYS = 90;
 const AUTH_REQUIRED_MESSAGE = "Você precisa estar logado em sua conta Google Cadastrada para entrar";
 const AUTHORIZED_EMAILS = [
   "giovannoni1806@gmail.com",
@@ -604,14 +604,9 @@ function handleUpdateObservation_(payload, user) {
   const observacoesColumn = REGISTROS_HEADERS.indexOf("Observacoes") + 1;
   const observacaoAtualizadaEmColumn = REGISTROS_HEADERS.indexOf("Observacao atualizada em") + 1;
   const observacaoAtualizadaPorColumn = REGISTROS_HEADERS.indexOf("Observacao atualizada por") + 1;
-  const resumoEdicaoColumn = REGISTROS_HEADERS.indexOf("Resumo da edicao") + 1;
-  const oldEntry = rowToEntry_(sheet.getRange(rowNumber, 1, 1, REGISTROS_HEADERS.length).getDisplayValues()[0], rowNumber);
   sheet.getRange(rowNumber, observacoesColumn).setValue(String(payload.observacoes || "").trim());
   sheet.getRange(rowNumber, observacaoAtualizadaEmColumn).setValue(new Date());
   sheet.getRange(rowNumber, observacaoAtualizadaPorColumn).setValue(user.email);
-  sheet.getRange(rowNumber, resumoEdicaoColumn).setValue(
-    appendEditHistory_(oldEntry.resumoEdicao, "Observacoes atualizadas.", user.email)
-  );
   applyRowFormats_(sheet, rowNumber);
 
   return jsonResponse({
@@ -761,6 +756,7 @@ function searchEntries_(query, limit) {
         entry.plantonistas,
         entry.observacoes,
         entry.criadoPor,
+        entry.observacaoAtualizadaPor,
         entry.editadoPor,
         entry.resumoEdicao,
       ].join(" ")).indexOf(normalizedQuery) !== -1;
@@ -800,8 +796,8 @@ function rowToEntry_(row, rowNumber) {
     criadoPor: row[9],
     observacaoAtualizadaEm: row[10],
     observacaoAtualizadaPor: row[11],
-    editadoEm: row[12] || row[10],
-    editadoPor: row[13] || row[11],
+    editadoEm: row[12],
+    editadoPor: row[13],
     resumoEdicao: row[14],
   };
 }

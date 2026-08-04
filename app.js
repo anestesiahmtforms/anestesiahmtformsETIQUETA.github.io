@@ -3,6 +3,7 @@ const CONFIG = {
   authSessionKey: "etiqueta-hmt-auth-session-v1",
   trustedDeviceKey: "etiqueta-hmt-trusted-device-v1",
   googleClientId: "908976987584-o59p0obmvq013lg3t9726itf06e15v2c.apps.googleusercontent.com",
+  trustedDeviceDays: 90,
   guideWidthRatio: 0.94,
   guideAspectRatio: 3.35,
   defaultScriptUrl: "https://script.google.com/macros/s/AKfycbzTb2EQ8iM-oB5KnxI26uBvG_ddjDLCD7G0YBov9mgLe7apX89vBECecaUnOHyRTwED/exec",
@@ -248,7 +249,7 @@ async function handleGoogleCredentialResponse(credential) {
       name: authResult.name || "",
       expiresAt: getJwtExpirationMs(credential),
       deviceToken: getOrCreateDeviceToken(),
-      trustedDeviceExpiresAt: authResult.trustedDeviceExpiresAt || "",
+      trustedDeviceExpiresAt: authResult.trustedDeviceExpiresAt || getTrustedDeviceFallbackExpiry(),
     });
     persistTrustedDeviceSession();
     hideAuthGate();
@@ -492,6 +493,10 @@ function getOrCreateDeviceToken() {
   return deviceToken;
 }
 
+function getTrustedDeviceFallbackExpiry() {
+  return new Date(Date.now() + CONFIG.trustedDeviceDays * 24 * 60 * 60 * 1000).toISOString();
+}
+
 function showAuthGate(message, options = {}) {
   if (authMessageEl) {
     authMessageEl.textContent = message;
@@ -705,6 +710,8 @@ function stopCamera() {
   state.stream.getTracks().forEach((track) => track.stop());
   state.stream = null;
   cameraEl.srcObject = null;
+  cameraStatusEl.textContent = "Camera desligada";
+  cameraStatusEl.className = "status-pill neutral";
 }
 
 async function captureFromCamera() {
@@ -775,6 +782,7 @@ async function processCurrentImage() {
     return;
   }
 
+  stopCamera();
   toggleBusy(true);
   setStatus("Lendo etiqueta com IA...", "info");
 
@@ -1323,10 +1331,9 @@ function renderSummary(rows, emptyMessage = "Nenhuma entrada encontrada nesta da
 
   summaryListEl.innerHTML = rows.map((row, index) => {
     const alertClass = isAlertType(row.tipo) ? " alert-row" : "";
-    const editedClass = row.editadoEm || row.editadoPor || row.resumoEdicao ? " edited-row" : "";
-    const editNote = row.resumoEdicao
-      ? `<small class="summary-edit-note">Alterado: ${escapeHtml(row.resumoEdicao)}</small>`
-      : "";
+    const editedClass = row.editadoEm || row.editadoPor || row.resumoEdicao || row.observacaoAtualizadaEm || row.observacaoAtualizadaPor ? " edited-row" : "";
+    const observationBlock = renderSummaryObservationBlock(row);
+    const editBlock = renderSummaryEditBlock(row);
     return `
       <article class="summary-item${alertClass}${editedClass}" data-row-number="${escapeHtml(row.rowNumber || "")}" tabindex="0" title="Toque duas vezes para editar">
         <div class="summary-index">${index + 1}</div>
@@ -1342,11 +1349,9 @@ function renderSummary(rows, emptyMessage = "Nenhuma entrada encontrada nesta da
         <div class="summary-plantonistas">
           <small>Plantonista(s)</small>
           <b>${escapeHtml(row.plantonistas || "-")}</b>
-          <span>${escapeHtml(row.observacoes || "")}</span>
-          <small class="summary-edit-meta">Ultima edicao: ${escapeHtml(row.editadoEm || "Sem edicao")}</small>
-          <small class="summary-edit-meta">Editado por: ${escapeHtml(row.editadoPor || "Sem edicao registrada")}</small>
         </div>
-        ${editNote}
+        ${observationBlock}
+        ${editBlock}
       </article>
     `;
   }).join("");
@@ -1369,6 +1374,38 @@ function renderSummary(rows, emptyMessage = "Nenhuma entrada encontrada nesta da
       lastTapAt = now;
     }, { passive: false });
   });
+}
+
+function renderSummaryObservationBlock(row) {
+  const hasObservation = row.observacoes || row.observacaoAtualizadaEm || row.observacaoAtualizadaPor;
+  if (!hasObservation) {
+    return "";
+  }
+
+  return `
+    <div class="summary-history-block summary-observation-block">
+      <strong>Observacao</strong>
+      <span>${escapeHtml(row.observacoes || "Sem texto de observacao.")}</span>
+      <small>Atualizada em: ${escapeHtml(row.observacaoAtualizadaEm || "Sem data registrada")}</small>
+      <small>Responsavel: ${escapeHtml(row.observacaoAtualizadaPor || "Sem responsavel registrado")}</small>
+    </div>
+  `;
+}
+
+function renderSummaryEditBlock(row) {
+  const hasEdit = row.editadoEm || row.editadoPor || row.resumoEdicao;
+  if (!hasEdit) {
+    return "";
+  }
+
+  return `
+    <div class="summary-history-block summary-edit-block">
+      <strong>Edicao de Registro</strong>
+      <small>Ultima edicao: ${escapeHtml(row.editadoEm || "Sem data registrada")}</small>
+      <small>Responsavel: ${escapeHtml(row.editadoPor || "Sem responsavel registrado")}</small>
+      ${row.resumoEdicao ? `<span class="summary-edit-note">Alterado: ${escapeHtml(row.resumoEdicao)}</span>` : ""}
+    </div>
+  `;
 }
 
 function openEditRecord(rowNumber) {
