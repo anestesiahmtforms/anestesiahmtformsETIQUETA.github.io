@@ -96,6 +96,7 @@ document.querySelector("#save-settings").addEventListener("click", saveSettings)
 document.querySelector("#generate-month-pdf-whatsapp").addEventListener("click", generateMonthlyPdfForWhatsApp);
 authGoogleButtonEl?.addEventListener("click", authorizeDeviceWithGoogle);
 homeReturnEl?.addEventListener("click", returnToHomePage);
+window.addEventListener("popstate", handleBrowserBack);
 summaryDateEl.addEventListener("change", () => {
   if (summarySearchEl) {
     summarySearchEl.value = "";
@@ -126,6 +127,7 @@ document.addEventListener("visibilitychange", () => {
 bootstrap();
 
 async function bootstrap() {
+  prepareBackNavigationToHome();
   const today = getTodayISO();
   fields.data.value = today;
   summaryDateEl.value = today;
@@ -145,6 +147,26 @@ async function bootstrap() {
 
 function returnToHomePage() {
   window.location.href = "https://anestesiahmtforms.github.io/?skipNotice=1";
+}
+
+function prepareBackNavigationToHome() {
+  if (!window.history?.pushState) {
+    return;
+  }
+
+  try {
+    const currentState = window.history.state || {};
+    if (!currentState.etiquetaBackGuard) {
+      window.history.replaceState({ ...currentState, etiquetaEntry: true }, "", window.location.href);
+      window.history.pushState({ etiquetaBackGuard: true }, "", window.location.href);
+    }
+  } catch {
+    // Se o navegador bloquear history API, o botão visual continua funcionando.
+  }
+}
+
+function handleBrowserBack() {
+  returnToHomePage();
 }
 
 async function authenticateUser() {
