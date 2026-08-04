@@ -46,6 +46,7 @@ const authMessageEl = document.querySelector("#auth-message");
 const authUserEl = document.querySelector("#auth-user");
 const authGoogleButtonEl = document.querySelector("#auth-google");
 const googleSigninEl = document.querySelector("#google-signin");
+const homeReturnEl = document.querySelector("#home-return");
 const scriptUrlEl = document.querySelector("#script-url");
 const formEl = document.querySelector("#label-form");
 const summaryDateEl = document.querySelector("#summary-date");
@@ -94,6 +95,7 @@ document.querySelector("#clear-form").addEventListener("click", resetForm);
 document.querySelector("#save-settings").addEventListener("click", saveSettings);
 document.querySelector("#generate-month-pdf-whatsapp").addEventListener("click", generateMonthlyPdfForWhatsApp);
 authGoogleButtonEl?.addEventListener("click", authorizeDeviceWithGoogle);
+homeReturnEl?.addEventListener("click", returnToHomePage);
 summaryDateEl.addEventListener("change", () => {
   if (summarySearchEl) {
     summarySearchEl.value = "";
@@ -139,6 +141,23 @@ async function bootstrap() {
   }
   await initializeAuthorizedApp();
   registerServiceWorker();
+}
+
+function returnToHomePage() {
+  const currentUrl = window.location.href.split("#")[0];
+  const referrer = document.referrer || "";
+  if (referrer && referrer.split("#")[0] !== currentUrl) {
+    window.location.href = referrer;
+    return;
+  }
+
+  if (window.history.length > 1) {
+    window.history.back();
+    return;
+  }
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  setStatus("Voce ja esta na pagina inicial do app.", "info");
 }
 
 async function authenticateUser() {

@@ -51,6 +51,22 @@ body {
   gap: 8px;
 }
 
+.home-return {
+  min-height: 32px;
+  padding: 7px 12px;
+  border: 1px solid rgba(11, 63, 58, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--brand);
+  box-shadow: 0 8px 20px rgba(12, 35, 31, 0.08);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.home-return:active {
+  transform: translateY(1px);
+}
+
 .eyebrow {
   display: inline-block;
   margin-bottom: 6px;
@@ -940,6 +956,16 @@ textarea {
   .topbar {
     align-items: start;
     flex-direction: column;
+  }
+
+  .topbar-status {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .home-return {
+    width: 100%;
+    justify-content: center;
   }
 
   .panel {
