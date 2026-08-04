@@ -144,20 +144,7 @@ async function bootstrap() {
 }
 
 function returnToHomePage() {
-  const currentUrl = window.location.href.split("#")[0];
-  const referrer = document.referrer || "";
-  if (referrer && referrer.split("#")[0] !== currentUrl) {
-    window.location.href = referrer;
-    return;
-  }
-
-  if (window.history.length > 1) {
-    window.history.back();
-    return;
-  }
-
-  window.scrollTo({ top: 0, behavior: "smooth" });
-  setStatus("Voce ja esta na pagina inicial do app.", "info");
+  window.location.href = "https://anestesiahmtforms.github.io/?skipNotice=1";
 }
 
 async function authenticateUser() {
