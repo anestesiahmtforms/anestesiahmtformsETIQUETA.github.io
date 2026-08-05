@@ -63,7 +63,6 @@ const sendFeedbackEl = document.querySelector("#send-feedback");
 const confirmOverlayEl = document.querySelector("#confirm-overlay");
 const confirmSummaryEl = document.querySelector("#confirm-summary");
 const confirmSendEl = document.querySelector("#confirm-send");
-const cancelSendEl = document.querySelector("#cancel-send");
 const editOverlayEl = document.querySelector("#edit-overlay");
 const editContextEl = document.querySelector("#edit-context");
 const editSummaryEl = document.querySelector("#edit-summary");
@@ -1082,7 +1081,7 @@ function confirmSubmission(payload, duplicateRows = []) {
 }
 
 function confirmSubmissionEditable(payload, duplicateRows = []) {
-  if (!confirmOverlayEl || !confirmSummaryEl || !confirmSendEl || !cancelSendEl) {
+  if (!confirmOverlayEl || !confirmSummaryEl || !confirmSendEl) {
     return Promise.resolve({ confirmed: false, payload, duplicateJustification: "" });
   }
 
@@ -1156,7 +1155,6 @@ function confirmSubmissionEditable(payload, duplicateRows = []) {
     const finish = (confirmed, finalPayload = currentPayload, duplicateJustification = "") => {
       confirmOverlayEl.hidden = true;
       confirmSendEl.removeEventListener("click", onConfirm);
-      cancelSendEl.removeEventListener("click", onCancel);
       confirmOverlayEl.removeEventListener("click", onBackdrop);
       document.removeEventListener("keydown", onKeydown);
       resolve({ confirmed, payload: finalPayload, duplicateJustification });
@@ -1181,7 +1179,6 @@ function confirmSubmissionEditable(payload, duplicateRows = []) {
 
       finish(true, currentPayload, duplicateJustification);
     };
-    const onCancel = () => finish(false);
     const onBackdrop = (event) => {
       if (event.target === confirmOverlayEl) {
         finish(false);
@@ -1194,7 +1191,6 @@ function confirmSubmissionEditable(payload, duplicateRows = []) {
     };
 
     confirmSendEl.addEventListener("click", onConfirm);
-    cancelSendEl.addEventListener("click", onCancel);
     confirmOverlayEl.addEventListener("click", onBackdrop);
     document.addEventListener("keydown", onKeydown);
   });
@@ -1454,7 +1450,7 @@ function renderEditHistoryLines(row) {
     return history
       .split(/\n+/)
       .filter(Boolean)
-      .map((line) => `<span class="summary-edit-note">${escapeHtml(line)}</span>`)
+      .map((line) => `<span class="summary-edit-note">${formatEditHistoryLine(line)}</span>`)
       .join("");
   }
 
@@ -1467,6 +1463,10 @@ function renderEditHistoryLines(row) {
 
 function composeHistoryLine(dateTime, responsible, detail) {
   return `${dateTime} - ${responsible}: ${detail}`;
+}
+
+function formatEditHistoryLine(line) {
+  return escapeHtml(line).replace(/-&gt; ([^;]+)/g, "-&gt; <span class=\"summary-new-value\">$1</span>");
 }
 
 function openEditRecord(rowNumber) {

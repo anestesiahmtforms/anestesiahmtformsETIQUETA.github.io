@@ -949,6 +949,11 @@ textarea {
   line-height: 1.25 !important;
 }
 
+.summary-new-value {
+  color: #15803d;
+  font-weight: 950;
+}
+
 .summary-index {
   width: 28px;
   height: 28px;

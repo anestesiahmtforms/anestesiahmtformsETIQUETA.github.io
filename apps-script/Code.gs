@@ -642,21 +642,30 @@ function handleUpdateRecord_(payload, user) {
     String(payload.observacoes || "").trim(),
   ];
   const changeSummary = buildEditSummary_(oldEntry, payload);
+  const observationChanged = normalizeCompare_(oldEntry.observacoes || "") !== normalizeCompare_(payload.observacoes || "");
 
   sheet.getRange(rowNumber, 1, 1, 8).setValues([updatedValues]);
 
+  const observacaoAtualizadaEmColumn = REGISTROS_HEADERS.indexOf("Observacao atualizada em") + 1;
+  const observacaoAtualizadaPorColumn = REGISTROS_HEADERS.indexOf("Observacao atualizada por") + 1;
   const editadoEmColumn = REGISTROS_HEADERS.indexOf("Editado em") + 1;
   const editadoPorColumn = REGISTROS_HEADERS.indexOf("Editado por") + 1;
   const resumoEdicaoColumn = REGISTROS_HEADERS.indexOf("Resumo da edicao") + 1;
-  sheet.getRange(rowNumber, editadoEmColumn).setValue(new Date());
-  sheet.getRange(rowNumber, editadoPorColumn).setValue(user.email);
-  sheet.getRange(rowNumber, resumoEdicaoColumn).setValue(
-    appendEditHistory_(
-      oldEntry.resumoEdicao,
-      changeSummary || "Registro revisado sem mudanca nos campos principais.",
-      user.email
-    )
-  );
+  if (observationChanged) {
+    sheet.getRange(rowNumber, observacaoAtualizadaEmColumn).setValue(new Date());
+    sheet.getRange(rowNumber, observacaoAtualizadaPorColumn).setValue(user.email);
+  }
+  if (changeSummary) {
+    sheet.getRange(rowNumber, editadoEmColumn).setValue(new Date());
+    sheet.getRange(rowNumber, editadoPorColumn).setValue(user.email);
+    sheet.getRange(rowNumber, resumoEdicaoColumn).setValue(
+      appendEditHistory_(
+        oldEntry.resumoEdicao,
+        changeSummary,
+        user.email
+      )
+    );
+  }
   applyRowFormats_(sheet, rowNumber);
 
   return jsonResponse({
@@ -676,7 +685,6 @@ function buildEditSummary_(oldEntry, payload) {
     { key: "tipo", label: "Tipo", oldValue: oldEntry.tipo, newValue: payload.tipo },
     { key: "credor", label: "Credor", oldValue: oldEntry.credor, newValue: payload.credor },
     { key: "plantonistas", label: "Plantonista(s)", oldValue: oldEntry.plantonistas, newValue: payload.credor === "Caixa" ? "" : payload.plantonistas },
-    { key: "observacoes", label: "Observacoes", oldValue: oldEntry.observacoes, newValue: payload.observacoes },
   ];
 
   return fields
