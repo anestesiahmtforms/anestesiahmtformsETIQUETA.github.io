@@ -582,6 +582,14 @@ function getJwtExpirationMs(token) {
 
 function ensureAuthenticated() {
   if (!state.authenticated || (!state.auth?.token && !state.auth?.deviceToken)) {
+    const savedAuth = getStoredTrustedDeviceSession();
+    if (savedAuth) {
+      applyAuthenticatedUser(savedAuth);
+      hideAuthGate();
+      renderAuthStatus();
+    }
+  }
+  if (!state.authenticated || (!state.auth?.token && !state.auth?.deviceToken)) {
     throw new Error("Você precisa estar logado em sua conta Google Cadastrada para entrar");
   }
 
@@ -631,7 +639,7 @@ function withAuthPayload(payload) {
   return {
     ...payload,
     ...authFields,
-    userEmail: auth.email,
+    userEmail: auth.email || payload.userEmail || "",
   };
 }
 
@@ -1479,7 +1487,6 @@ function formatEditHistoryLine(line) {
   const prefix = rawLine.slice(0, userSeparatorIndex + 2);
   const details = rawLine.slice(userSeparatorIndex + 2);
   return escapeHtml(prefix) + escapeHtml(details)
-    .replace(/(^|; )([^:;]+):/g, "$1<span class=\"summary-edited-field\">$2</span>:")
     .replace(/-&gt; ([^;]+)/g, "-&gt; <span class=\"summary-new-value\">$1</span>");
 }
 
