@@ -210,13 +210,19 @@ function doPost(e) {
       payload.tipo || "",
       payload.credor || "",
       payload.plantonistas || "",
-      buildObservacoes_(payload),
+      compactCellText_(buildObservacoes_(payload), "Observacao"),
       new Date(),
       user.email,
       "",
       "",
     ]);
-    applyRowFormats_(sheet, sheet.getLastRow());
+    const appendedRow = sheet.getLastRow();
+    setCompactCellWithNote_(
+      sheet.getRange(appendedRow, REGISTROS_HEADERS.indexOf("Observacoes") + 1),
+      buildObservacoes_(payload),
+      "Observacao"
+    );
+    applyRowFormats_(sheet, appendedRow);
 
     return jsonResponse({
       ok: true,
@@ -625,7 +631,11 @@ function handleUpdateObservation_(payload, user) {
   const observacoesColumn = REGISTROS_HEADERS.indexOf("Observacoes") + 1;
   const observacaoAtualizadaEmColumn = REGISTROS_HEADERS.indexOf("Observacao atualizada em") + 1;
   const observacaoAtualizadaPorColumn = REGISTROS_HEADERS.indexOf("Observacao atualizada por") + 1;
-  sheet.getRange(rowNumber, observacoesColumn).setValue(String(payload.observacoes || "").trim());
+  setCompactCellWithNote_(
+    sheet.getRange(rowNumber, observacoesColumn),
+    String(payload.observacoes || "").trim(),
+    "Observacao"
+  );
   sheet.getRange(rowNumber, observacaoAtualizadaEmColumn).setValue(new Date());
   sheet.getRange(rowNumber, observacaoAtualizadaPorColumn).setValue(user.email);
   applyRowFormats_(sheet, rowNumber);
@@ -634,7 +644,7 @@ function handleUpdateObservation_(payload, user) {
     ok: true,
     message: "Observacao atualizada com sucesso.",
     userEmail: user.email,
-    entry: rowToEntry_(sheet.getRange(rowNumber, 1, 1, REGISTROS_HEADERS.length).getDisplayValues()[0], rowNumber),
+    entry: rowToEntryFromSheet_(sheet, rowNumber),
   });
 }
 
@@ -651,7 +661,7 @@ function handleUpdateRecord_(payload, user) {
     throw new Error("Registro nao encontrado na planilha.");
   }
 
-  const oldEntry = rowToEntry_(sheet.getRange(rowNumber, 1, 1, REGISTROS_HEADERS.length).getDisplayValues()[0], rowNumber);
+  const oldEntry = rowToEntryFromSheet_(sheet, rowNumber);
   const updatedValues = [
     parseIsoDate_(payload.data) || payload.data || "",
     payload.nomePaciente || "",
@@ -660,12 +670,17 @@ function handleUpdateRecord_(payload, user) {
     payload.tipo || "",
     payload.credor || "",
     payload.credor === "Caixa" ? "" : (payload.plantonistas || ""),
-    String(payload.observacoes || "").trim(),
+    compactCellText_(String(payload.observacoes || "").trim(), "Observacao"),
   ];
   const changeSummary = buildEditSummary_(oldEntry, payload);
   const observationChanged = normalizeCompare_(oldEntry.observacoes || "") !== normalizeCompare_(payload.observacoes || "");
 
   sheet.getRange(rowNumber, 1, 1, 8).setValues([updatedValues]);
+  setCompactCellWithNote_(
+    sheet.getRange(rowNumber, REGISTROS_HEADERS.indexOf("Observacoes") + 1),
+    String(payload.observacoes || "").trim(),
+    "Observacao"
+  );
 
   const observacaoAtualizadaEmColumn = REGISTROS_HEADERS.indexOf("Observacao atualizada em") + 1;
   const observacaoAtualizadaPorColumn = REGISTROS_HEADERS.indexOf("Observacao atualizada por") + 1;
@@ -679,12 +694,14 @@ function handleUpdateRecord_(payload, user) {
   if (changeSummary) {
     sheet.getRange(rowNumber, editadoEmColumn).setValue(new Date());
     sheet.getRange(rowNumber, editadoPorColumn).setValue(user.email);
-    sheet.getRange(rowNumber, resumoEdicaoColumn).setValue(
+    setCompactCellWithNote_(
+      sheet.getRange(rowNumber, resumoEdicaoColumn),
       appendEditHistory_(
         oldEntry.resumoEdicao,
         changeSummary,
         user.email
-      )
+      ),
+      "Edicao"
     );
   }
   applyRowFormats_(sheet, rowNumber);
@@ -693,7 +710,7 @@ function handleUpdateRecord_(payload, user) {
     ok: true,
     message: "Registro editado com sucesso.",
     userEmail: user.email,
-    entry: rowToEntry_(sheet.getRange(rowNumber, 1, 1, REGISTROS_HEADERS.length).getDisplayValues()[0], rowNumber),
+    entry: rowToEntryFromSheet_(sheet, rowNumber),
   });
 }
 
@@ -805,12 +822,15 @@ function getAllEntries_() {
     return [];
   }
 
-  const values = sheet.getRange(2, 1, lastRow - 1, REGISTROS_HEADERS.length).getDisplayValues();
+  const dataRange = sheet.getRange(2, 1, lastRow - 1, REGISTROS_HEADERS.length);
+  const values = dataRange.getDisplayValues();
+  const notes = dataRange.getNotes();
   return values
-    .map((row, index) => rowToEntry_(row, index + 2));
+    .map((row, index) => rowToEntry_(row, index + 2, notes[index]));
 }
 
-function rowToEntry_(row, rowNumber) {
+function rowToEntry_(row, rowNumber, notes) {
+  notes = notes || [];
   return {
     rowNumber,
     data: normalizeDate_(row[0]),
@@ -820,15 +840,39 @@ function rowToEntry_(row, rowNumber) {
     tipo: row[4],
     credor: row[5],
     plantonistas: row[6],
-    observacoes: row[7],
+    observacoes: notes[7] || row[7],
     criadoEm: row[8],
     criadoPor: row[9],
     observacaoAtualizadaEm: row[10],
     observacaoAtualizadaPor: row[11],
     editadoEm: row[12],
     editadoPor: row[13],
-    resumoEdicao: row[14],
+    resumoEdicao: notes[14] || row[14],
   };
+}
+
+function rowToEntryFromSheet_(sheet, rowNumber) {
+  const range = sheet.getRange(rowNumber, 1, 1, REGISTROS_HEADERS.length);
+  return rowToEntry_(range.getDisplayValues()[0], rowNumber, range.getNotes()[0]);
+}
+
+function setCompactCellWithNote_(range, fullText, label) {
+  const text = String(fullText || "").trim();
+  range.setValue(compactCellText_(text, label));
+  if (text) {
+    range.setNote(text);
+  } else {
+    range.clearNote();
+  }
+}
+
+function compactCellText_(fullText, label) {
+  const text = String(fullText || "").trim();
+  if (!text) {
+    return "";
+  }
+
+  return label + " em nota";
 }
 
 function getSpreadsheet_() {
