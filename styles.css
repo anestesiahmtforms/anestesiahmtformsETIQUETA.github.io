@@ -954,6 +954,12 @@ textarea {
   font-weight: 950;
 }
 
+.summary-edited-field {
+  color: #d99a24;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
 .summary-index {
   width: 28px;
   height: 28px;

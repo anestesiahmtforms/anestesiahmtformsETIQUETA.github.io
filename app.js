@@ -1,6 +1,7 @@
 const CONFIG = {
   storageKey: "etiqueta-hmt-ia-v1",
   authSessionKey: "etiqueta-hmt-auth-session-v1",
+  authSessionBackupKey: "etiqueta-hmt-auth-session-backup-v1",
   trustedDeviceKey: "etiqueta-hmt-trusted-device-v1",
   googleClientId: "908976987584-o59p0obmvq013lg3t9726itf06e15v2c.apps.googleusercontent.com",
   trustedDeviceDays: 90,
@@ -392,7 +393,9 @@ function persistTrustedDeviceSession() {
   }
 
   try {
-    localStorage.setItem(CONFIG.authSessionKey, JSON.stringify(state.auth));
+    const serialized = JSON.stringify(state.auth);
+    localStorage.setItem(CONFIG.authSessionKey, serialized);
+    sessionStorage.setItem(CONFIG.authSessionBackupKey, serialized);
   } catch (error) {
     console.warn("Nao foi possivel salvar dispositivo confiavel:", error);
   }
@@ -415,7 +418,8 @@ async function restoreTrustedDeviceSession() {
 
 function getStoredTrustedDeviceSession() {
   try {
-    const saved = JSON.parse(localStorage.getItem(CONFIG.authSessionKey) || "null");
+    const raw = localStorage.getItem(CONFIG.authSessionKey) || sessionStorage.getItem(CONFIG.authSessionBackupKey) || "null";
+    const saved = JSON.parse(raw);
     if (!saved?.deviceToken || !saved?.email || !saved?.trustedDeviceExpiresAt) {
       return null;
     }
@@ -439,19 +443,14 @@ async function validateTrustedDeviceInBackground(savedAuth) {
     persistTrustedDeviceSession();
     renderAuthStatus();
   } catch (error) {
-    console.warn("Dispositivo confiavel expirou ou foi recusado:", error);
-    state.auth = null;
-    state.authenticated = false;
-    clearAuthSession();
-    renderAuthStatus();
-    showAuthGate("Voce precisa estar logado em sua conta Google cadastrada para entrar.", { showButton: true });
-    prepareGoogleLoginSurface("Toque abaixo para autorizar novamente este dispositivo.", { showButton: true });
+    console.warn("Validacao em segundo plano nao concluida; mantendo dispositivo local autorizado:", error);
   }
 }
 
 function clearAuthSession() {
   try {
     localStorage.removeItem(CONFIG.authSessionKey);
+    sessionStorage.removeItem(CONFIG.authSessionBackupKey);
   } catch {
     // Sessao indisponivel; sem impacto funcional.
   }
@@ -492,6 +491,7 @@ async function validateTrustedDevice(savedAuth) {
     body: JSON.stringify({
       action: "auth",
       deviceToken: savedAuth.deviceToken,
+      userEmail: savedAuth.email,
     }),
   });
   const result = await response.json();
@@ -504,6 +504,7 @@ async function validateTrustedDevice(savedAuth) {
     ...savedAuth,
     email: String(result.email || savedAuth.email || "").toLowerCase(),
     name: result.name || savedAuth.name || "",
+    trustedDeviceExpiresAt: result.trustedDeviceExpiresAt || savedAuth.trustedDeviceExpiresAt || getTrustedDeviceFallbackExpiry(),
     token: "",
   };
 }
@@ -610,6 +611,9 @@ function addAuthToUrl(url) {
   }
   if (auth.deviceToken) {
     url.searchParams.set("deviceToken", auth.deviceToken);
+  }
+  if (auth.email) {
+    url.searchParams.set("userEmail", auth.email);
   }
   return url;
 }
@@ -1466,7 +1470,17 @@ function composeHistoryLine(dateTime, responsible, detail) {
 }
 
 function formatEditHistoryLine(line) {
-  return escapeHtml(line).replace(/-&gt; ([^;]+)/g, "-&gt; <span class=\"summary-new-value\">$1</span>");
+  const rawLine = String(line || "");
+  const userSeparatorIndex = rawLine.indexOf(": ", rawLine.indexOf(" - ") + 3);
+  if (userSeparatorIndex === -1) {
+    return escapeHtml(rawLine);
+  }
+
+  const prefix = rawLine.slice(0, userSeparatorIndex + 2);
+  const details = rawLine.slice(userSeparatorIndex + 2);
+  return escapeHtml(prefix) + escapeHtml(details)
+    .replace(/(^|; )([^:;]+):/g, "$1<span class=\"summary-edited-field\">$2</span>:")
+    .replace(/-&gt; ([^;]+)/g, "-&gt; <span class=\"summary-new-value\">$1</span>");
 }
 
 function openEditRecord(rowNumber) {

@@ -100,7 +100,8 @@ function doGet(e) {
   try {
     const user = requireAuthorized_(
       e && e.parameter && e.parameter.authToken,
-      e && e.parameter && e.parameter.deviceToken
+      e && e.parameter && e.parameter.deviceToken,
+      e && e.parameter && e.parameter.userEmail
     );
     const spreadsheet = ensureWorkbook_();
     const action = (e && e.parameter && e.parameter.action) || "";
@@ -171,7 +172,8 @@ function doPost(e) {
 
     const user = requireAuthorized_(
       payload.authToken || (e.parameter && e.parameter.authToken),
-      payload.deviceToken || (e.parameter && e.parameter.deviceToken)
+      payload.deviceToken || (e.parameter && e.parameter.deviceToken),
+      payload.userEmail || (e.parameter && e.parameter.userEmail)
     );
 
     if (action === "aiHealth") {
@@ -233,14 +235,14 @@ function doPost(e) {
 function handleAuth_(payload) {
   const user = payload.authToken
     ? requireAuthorized_(payload.authToken, "")
-    : requireAuthorized_("", payload.deviceToken);
+    : requireAuthorized_("", payload.deviceToken, payload.userEmail);
   const response = {
     ok: true,
     email: user.email,
     name: user.name,
   };
 
-  if (payload.authToken && payload.deviceToken) {
+  if (payload.deviceToken) {
     response.trustedDeviceExpiresAt = registerTrustedDevice_(payload.deviceToken, user);
   }
 
@@ -273,10 +275,15 @@ function handleAiHealth_(user) {
   });
 }
 
-function requireAuthorized_(idToken, deviceToken) {
+function requireAuthorized_(idToken, deviceToken, claimedEmail) {
   const trustedUser = verifyTrustedDevice_(deviceToken);
   if (trustedUser) {
     return trustedUser;
+  }
+
+  const fallbackUser = recoverTrustedDeviceFromClaim_(deviceToken, claimedEmail);
+  if (fallbackUser) {
+    return fallbackUser;
   }
 
   const token = String(idToken || "").trim();
@@ -293,6 +300,20 @@ function requireAuthorized_(idToken, deviceToken) {
   return {
     email,
     name: user.name || "",
+  };
+}
+
+function recoverTrustedDeviceFromClaim_(deviceToken, claimedEmail) {
+  const token = normalizeDeviceToken_(deviceToken);
+  const email = String(claimedEmail || "").trim().toLowerCase();
+  if (!token || !email || AUTHORIZED_EMAILS.indexOf(email) === -1) {
+    return null;
+  }
+
+  registerTrustedDevice_(token, { email, name: "" });
+  return {
+    email,
+    name: "",
   };
 }
 
