@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Manrope:wght@500;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=57">
+  <link rel="stylesheet" href="./styles.css?v=58">
 </head>
 <body>
   <div class="app-shell">
@@ -57,7 +57,7 @@
         <p id="processing-status" class="hint">Capture a etiqueta inteira. A IA vai extrair Nome do Paciente, Cirurgia e Atendimento.</p>
       </section>
 
-      <section class="panel form-panel">
+      <section class="panel form-panel" id="entry-panel" hidden>
         <div class="section-title">
           <h2>Entrada</h2>
         </div>
@@ -154,27 +154,25 @@
           <h2>Resumo do dia</h2>
         </div>
 
-        <p class="hint">Toque duas vezes em um registro para editar. O app mantem quem lancou e registra quem editou.</p>
-        <div id="summary-totals" class="summary-totals" hidden></div>
-        <div id="summary-list" class="summary-list">
-          <p class="empty-state">Nenhum resumo carregado ainda.</p>
-        </div>
         <div class="summary-bottom-tools">
           <label class="summary-date-picker">
-            <span>Pesquisar por Data</span>
-            <div class="summary-search-box">
-              <input id="summary-date" type="date">
-              <button id="summary-date-button" type="button" aria-label="Pesquisar por data">Buscar</button>
-            </div>
-          </label>
-          <label class="summary-date-picker summary-search-picker">
-            <span>Pesquisar por Dados de Registro</span>
+            <span>Pesquisar</span>
             <div class="summary-search-box">
               <input id="summary-search" type="search" autocomplete="off" placeholder="Nome, cirurgia, atendimento, tipo ou plantonista">
               <button id="summary-search-button" type="button" aria-label="Pesquisar por dados de registro">Buscar</button>
             </div>
           </label>
-          <button id="summary-today-button" type="button" class="secondary">Resumo de hoje</button>
+          <label class="summary-date-picker summary-search-picker">
+            <span>Pesquisar por data</span>
+            <div class="summary-search-box">
+              <input id="summary-date" type="date">
+              <button id="summary-date-button" type="button" aria-label="Pesquisar por data">Buscar</button>
+            </div>
+          </label>
+        </div>
+        <div id="summary-totals" class="summary-totals" hidden></div>
+        <div id="summary-list" class="summary-list">
+          <p class="empty-state">Nenhum resumo carregado ainda.</p>
         </div>
       </section>
 
@@ -183,16 +181,15 @@
           <h2>Relatorio mensal</h2>
         </div>
 
-        <div class="summary-tools">
+        <button id="open-monthly-report" type="button" class="wide-button">Relatorio mensal</button>
+        <div id="monthly-report-panel" class="monthly-report-panel" hidden>
           <label>
             <span>Selecionar mes</span>
             <input id="report-month" type="month">
           </label>
           <button id="generate-month-pdf-whatsapp" type="button">PDF mensal no WhatsApp</button>
+          <p id="monthly-status" class="monthly-status">Relatorio mensal ainda nao atualizado.</p>
         </div>
-
-        <p id="monthly-status" class="monthly-status">Relatorio mensal ainda nao atualizado.</p>
-        <p class="hint">Gera uma tabela mensal em PDF. Em celulares compativeis, o compartilhamento abre o WhatsApp pela tela de envio.</p>
       </section>
 
       <section class="panel settings-panel" hidden>
@@ -267,6 +264,6 @@
       }
     })();
   </script>
-  <script src="./app.js?v=57" type="module"></script>
+  <script src="./app.js?v=58" type="module"></script>
 </body>
 </html>
