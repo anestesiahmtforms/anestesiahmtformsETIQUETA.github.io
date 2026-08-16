@@ -51,15 +51,19 @@ const googleSigninEl = document.querySelector("#google-signin");
 const homeReturnEl = document.querySelector("#home-return");
 const scriptUrlEl = document.querySelector("#script-url");
 const entryPanelEl = document.querySelector("#entry-panel");
+const entryCloseButtonEl = document.querySelector("#close-entry-panel");
 const formEl = document.querySelector("#label-form");
+const summaryPanelEl = document.querySelector("#summary-panel");
+const summaryPanelButtonEl = document.querySelector("#open-summary-panel");
+const summaryCloseButtonEl = document.querySelector("#close-summary-panel");
 const summaryDateEl = document.querySelector("#summary-date");
-const summaryDateButtonEl = document.querySelector("#summary-date-button");
 const summarySearchEl = document.querySelector("#summary-search");
 const summarySearchButtonEl = document.querySelector("#summary-search-button");
 const summaryTodayButtonEl = document.querySelector("#summary-today-button");
 const reportMonthEl = document.querySelector("#report-month");
 const monthlyReportButtonEl = document.querySelector("#open-monthly-report");
-const monthlyReportPanelEl = document.querySelector("#monthly-report-panel");
+const monthlyPanelEl = document.querySelector("#monthly-panel");
+const monthlyCloseButtonEl = document.querySelector("#close-monthly-report");
 const summaryTotalsEl = document.querySelector("#summary-totals");
 const summaryListEl = document.querySelector("#summary-list");
 const monthlyStatusEl = document.querySelector("#monthly-status");
@@ -107,16 +111,19 @@ summaryDateEl.addEventListener("change", () => {
     summarySearchEl.value = "";
   }
 });
-summaryDateButtonEl?.addEventListener("click", runSummaryDateSearch);
 summarySearchEl.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     event.preventDefault();
     runSummarySearch();
   }
 });
+entryCloseButtonEl?.addEventListener("click", hideEntryPanel);
+summaryPanelButtonEl?.addEventListener("click", openSummaryPanel);
+summaryCloseButtonEl?.addEventListener("click", closeSummaryPanel);
 summarySearchButtonEl?.addEventListener("click", runSummarySearch);
 summaryTodayButtonEl?.addEventListener("click", resetSummaryToToday);
 monthlyReportButtonEl?.addEventListener("click", toggleMonthlyReportPanel);
+monthlyCloseButtonEl?.addEventListener("click", closeMonthlyReportPanel);
 reportMonthEl.addEventListener("change", loadMonthlySummary);
 fields.credor.addEventListener("change", syncPlantonistasRequirement);
 editSaveEl?.addEventListener("click", saveEditedRecord);
@@ -917,8 +924,9 @@ function showEntryPanel(options = {}) {
 
   entryPanelEl.hidden = false;
   entryPanelEl.classList.add("is-open");
+  syncModalLock();
   if (options.scroll !== false) {
-    entryPanelEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    entryPanelEl.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 }
 
@@ -929,6 +937,62 @@ function hideEntryPanel() {
 
   entryPanelEl.hidden = true;
   entryPanelEl.classList.remove("is-open");
+  syncModalLock();
+}
+
+function openSummaryPanel() {
+  if (!summaryPanelEl) {
+    return;
+  }
+
+  summaryPanelEl.hidden = false;
+  summaryPanelEl.classList.add("is-open");
+  syncModalLock();
+  if (!summaryDateEl.value) {
+    summaryDateEl.value = getTodayISO();
+  }
+  if (!summarySearchEl?.value.trim()) {
+    loadSummary({ silent: true, date: summaryDateEl.value || getTodayISO() });
+  }
+}
+
+function closeSummaryPanel() {
+  if (!summaryPanelEl) {
+    return;
+  }
+
+  summaryPanelEl.hidden = true;
+  summaryPanelEl.classList.remove("is-open");
+  syncModalLock();
+}
+
+function openMonthlyReportPanel() {
+  if (!monthlyPanelEl) {
+    return;
+  }
+
+  monthlyPanelEl.hidden = false;
+  monthlyPanelEl.classList.add("is-open");
+  monthlyReportButtonEl?.setAttribute("aria-expanded", "true");
+  reportMonthEl.value = reportMonthEl.value || getTodayISO().slice(0, 7);
+  syncModalLock();
+  loadMonthlySummary({ silent: true });
+}
+
+function closeMonthlyReportPanel() {
+  if (!monthlyPanelEl) {
+    return;
+  }
+
+  monthlyPanelEl.hidden = true;
+  monthlyPanelEl.classList.remove("is-open");
+  monthlyReportButtonEl?.setAttribute("aria-expanded", "false");
+  syncModalLock();
+}
+
+function syncModalLock() {
+  const hasOpenPanel = [entryPanelEl, summaryPanelEl, monthlyPanelEl].some((panel) => panel && !panel.hidden);
+  document.body.classList.toggle("modal-open", hasOpenPanel);
 }
 
 function collectFormData() {
@@ -1334,18 +1398,11 @@ async function loadSummary(options = {}) {
 function runSummarySearch() {
   const query = summarySearchEl?.value.trim() || "";
   if (!query) {
-    resetSummaryToToday();
+    loadSummary({ silent: false, date: summaryDateEl?.value || getTodayISO() });
     return;
   }
 
   loadSummary({ silent: false });
-}
-
-function runSummaryDateSearch() {
-  if (summarySearchEl) {
-    summarySearchEl.value = "";
-  }
-  loadSummary({ silent: false, date: summaryDateEl?.value || getTodayISO() });
 }
 
 function resetSummaryToToday() {
@@ -1395,19 +1452,14 @@ function renderMonthlyStatus(message, tone = "neutral") {
 }
 
 function toggleMonthlyReportPanel() {
-  if (!monthlyReportPanelEl) {
+  if (!monthlyPanelEl) {
     return;
   }
 
-  const willOpen = monthlyReportPanelEl.hidden;
-  monthlyReportPanelEl.hidden = !willOpen;
-  monthlyReportPanelEl.classList.toggle("is-open", willOpen);
-  monthlyReportButtonEl?.setAttribute("aria-expanded", String(willOpen));
-
-  if (willOpen) {
-    reportMonthEl.value = reportMonthEl.value || getTodayISO().slice(0, 7);
-    loadMonthlySummary({ silent: true });
-    monthlyReportPanelEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  if (monthlyPanelEl.hidden) {
+    openMonthlyReportPanel();
+  } else {
+    closeMonthlyReportPanel();
   }
 }
 
