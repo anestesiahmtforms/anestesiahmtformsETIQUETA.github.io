@@ -6,18 +6,22 @@
   <meta name="theme-color" content="#0b3f3a">
   <title>ETIQUETAS SAHMT</title>
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./styles.css?v=52">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css?v=53">
 </head>
 <body>
   <div class="app-shell">
     <header class="topbar">
-      <div>
-        <a class="brand-logo" href="https://anestesiahmtforms.github.io/anestesiahmtformsESCALA.github.io/" aria-label="Abrir app principal SAHMT">
-          <h1>ETIQUETAS SAHMT</h1>
-        </a>
+      <a id="home-return" class="home-logo-link" href="https://anestesiahmtforms.github.io/anestesiahmtformsESCALA.github.io/" aria-label="Voltar ao app principal SAHMT">
+        <img src="https://anestesiahmtforms.github.io/anestesiahmtformsESCALA.github.io/assets/sahmt-logo.png" alt="SAHMT" class="home-logo-image">
+      </a>
+      <div class="hero-copy">
+        <span class="hero-kicker">Leitura inteligente</span>
+        <h1>ETIQUETAS SAHMT</h1>
       </div>
       <div class="topbar-status">
-        <button id="home-return" type="button" class="home-return">Voltar à página inicial</button>
         <span id="auth-user" class="status-pill neutral">Verificando acesso</span>
         <span id="sheet-status" class="status-pill neutral">Planilha nao configurada</span>
       </div>
@@ -263,6 +267,6 @@
       }
     })();
   </script>
-  <script src="./app.js?v=52" type="module"></script>
+  <script src="./app.js?v=53" type="module"></script>
 </body>
 </html>
