@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Manrope:wght@500;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=58">
+  <link rel="stylesheet" href="./styles.css?v=59">
 </head>
 <body>
   <div class="app-shell">
@@ -57,9 +57,20 @@
         <p id="processing-status" class="hint">Capture a etiqueta inteira. A IA vai extrair Nome do Paciente, Cirurgia e Atendimento.</p>
       </section>
 
-      <section class="panel form-panel" id="entry-panel" hidden>
+      <section class="panel quick-actions-panel">
+        <div class="section-title">
+          <h2>Acoes</h2>
+        </div>
+        <div class="quick-actions">
+          <button id="open-summary-panel" type="button" class="wide-button">Resumo do dia</button>
+          <button id="open-monthly-report" type="button" class="wide-button secondary">Relatorio mensal</button>
+        </div>
+      </section>
+
+      <section class="panel form-panel modal-panel" id="entry-panel" hidden>
         <div class="section-title">
           <h2>Entrada</h2>
+          <button id="close-entry-panel" type="button" class="modal-close" aria-label="Fechar entrada">Fechar</button>
         </div>
 
         <form id="label-form" class="form-grid">
@@ -149,24 +160,19 @@
         <p id="send-feedback" class="send-feedback" hidden></p>
       </section>
 
-      <section class="panel summary-panel">
+      <section class="panel summary-panel modal-panel" id="summary-panel" hidden>
         <div class="section-title">
           <h2>Resumo do dia</h2>
+          <button id="close-summary-panel" type="button" class="modal-close" aria-label="Fechar resumo">Fechar</button>
         </div>
 
         <div class="summary-bottom-tools">
           <label class="summary-date-picker">
             <span>Pesquisar</span>
             <div class="summary-search-box">
-              <input id="summary-search" type="search" autocomplete="off" placeholder="Nome, cirurgia, atendimento, tipo ou plantonista">
-              <button id="summary-search-button" type="button" aria-label="Pesquisar por dados de registro">Buscar</button>
-            </div>
-          </label>
-          <label class="summary-date-picker summary-search-picker">
-            <span>Pesquisar por data</span>
-            <div class="summary-search-box">
-              <input id="summary-date" type="date">
-              <button id="summary-date-button" type="button" aria-label="Pesquisar por data">Buscar</button>
+              <input id="summary-search" type="search" autocomplete="off" placeholder="Dados do registro">
+              <input id="summary-date" type="date" aria-label="Pesquisar por data">
+              <button id="summary-search-button" type="button" aria-label="Pesquisar">Pesquisar</button>
             </div>
           </label>
         </div>
@@ -176,13 +182,13 @@
         </div>
       </section>
 
-      <section class="panel monthly-panel">
+      <section class="panel monthly-panel modal-panel" id="monthly-panel" hidden>
         <div class="section-title">
           <h2>Relatorio mensal</h2>
+          <button id="close-monthly-report" type="button" class="modal-close" aria-label="Fechar relatorio mensal">Fechar</button>
         </div>
 
-        <button id="open-monthly-report" type="button" class="wide-button">Relatorio mensal</button>
-        <div id="monthly-report-panel" class="monthly-report-panel" hidden>
+        <div id="monthly-report-panel" class="monthly-report-panel">
           <label>
             <span>Selecionar mes</span>
             <input id="report-month" type="month">
@@ -264,6 +270,6 @@
       }
     })();
   </script>
-  <script src="./app.js?v=58" type="module"></script>
+  <script src="./app.js?v=59" type="module"></script>
 </body>
 </html>
