@@ -50,6 +50,7 @@ const authGoogleButtonEl = document.querySelector("#auth-google");
 const googleSigninEl = document.querySelector("#google-signin");
 const homeReturnEl = document.querySelector("#home-return");
 const scriptUrlEl = document.querySelector("#script-url");
+const entryPanelEl = document.querySelector("#entry-panel");
 const formEl = document.querySelector("#label-form");
 const summaryDateEl = document.querySelector("#summary-date");
 const summaryDateButtonEl = document.querySelector("#summary-date-button");
@@ -57,6 +58,8 @@ const summarySearchEl = document.querySelector("#summary-search");
 const summarySearchButtonEl = document.querySelector("#summary-search-button");
 const summaryTodayButtonEl = document.querySelector("#summary-today-button");
 const reportMonthEl = document.querySelector("#report-month");
+const monthlyReportButtonEl = document.querySelector("#open-monthly-report");
+const monthlyReportPanelEl = document.querySelector("#monthly-report-panel");
 const summaryTotalsEl = document.querySelector("#summary-totals");
 const summaryListEl = document.querySelector("#summary-list");
 const monthlyStatusEl = document.querySelector("#monthly-status");
@@ -113,6 +116,7 @@ summarySearchEl.addEventListener("keydown", (event) => {
 });
 summarySearchButtonEl?.addEventListener("click", runSummarySearch);
 summaryTodayButtonEl?.addEventListener("click", resetSummaryToToday);
+monthlyReportButtonEl?.addEventListener("click", toggleMonthlyReportPanel);
 reportMonthEl.addEventListener("change", loadMonthlySummary);
 fields.credor.addEventListener("change", syncPlantonistasRequirement);
 editSaveEl?.addEventListener("click", saveEditedRecord);
@@ -832,6 +836,7 @@ async function processCurrentImage() {
   try {
     const parsed = await extractLabelWithAi(state.imageBlob);
     applyDataToForm(parsed);
+    showEntryPanel();
 
     const missing = ["nomePaciente", "cirurgia", "atendimento"].filter((key) => !parsed[key]);
     const qualityNote = missing.length ? " Confira a foto e tente novamente com a etiqueta inteira mais nitida." : "";
@@ -903,6 +908,27 @@ function applyDataToForm(data) {
   if (data.atendimento) {
     fields.atendimento.value = data.atendimento;
   }
+}
+
+function showEntryPanel(options = {}) {
+  if (!entryPanelEl) {
+    return;
+  }
+
+  entryPanelEl.hidden = false;
+  entryPanelEl.classList.add("is-open");
+  if (options.scroll !== false) {
+    entryPanelEl.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+function hideEntryPanel() {
+  if (!entryPanelEl) {
+    return;
+  }
+
+  entryPanelEl.hidden = true;
+  entryPanelEl.classList.remove("is-open");
 }
 
 function collectFormData() {
@@ -1368,6 +1394,23 @@ function renderMonthlyStatus(message, tone = "neutral") {
   monthlyStatusEl.dataset.tone = tone;
 }
 
+function toggleMonthlyReportPanel() {
+  if (!monthlyReportPanelEl) {
+    return;
+  }
+
+  const willOpen = monthlyReportPanelEl.hidden;
+  monthlyReportPanelEl.hidden = !willOpen;
+  monthlyReportPanelEl.classList.toggle("is-open", willOpen);
+  monthlyReportButtonEl?.setAttribute("aria-expanded", String(willOpen));
+
+  if (willOpen) {
+    reportMonthEl.value = reportMonthEl.value || getTodayISO().slice(0, 7);
+    loadMonthlySummary({ silent: true });
+    monthlyReportPanelEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+}
+
 function renderSummary(rows, emptyMessage = "Nenhuma entrada encontrada nesta data.") {
   summaryTotalsEl.innerHTML = "";
 
@@ -1382,7 +1425,7 @@ function renderSummary(rows, emptyMessage = "Nenhuma entrada encontrada nesta da
     const editBlock = renderSummaryEditBlock(row);
     const observationBlock = renderSummaryObservationBlock(row);
     return `
-      <article class="summary-item${alertClass}${editedClass}" data-row-number="${escapeHtml(row.rowNumber || "")}" tabindex="0" title="Toque duas vezes para editar">
+      <article class="summary-item${alertClass}${editedClass}" data-row-number="${escapeHtml(row.rowNumber || "")}" tabindex="0">
         <div class="summary-index">${index + 1}</div>
         <div class="summary-main">
           <strong>${escapeHtml(row.nomePaciente || "")}</strong>
@@ -1891,6 +1934,10 @@ function resetForm(options = {}) {
 
   if (!options.keepImage) {
     clearImage();
+  }
+
+  if (options.hideEntry !== false) {
+    hideEntryPanel();
   }
 }
 
