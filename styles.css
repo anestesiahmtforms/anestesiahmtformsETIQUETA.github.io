@@ -244,6 +244,10 @@ h2 {
   color: var(--danger);
 }
 
+#sheet-status {
+  display: none;
+}
+
 .auth-locked {
   overflow: hidden;
 }
