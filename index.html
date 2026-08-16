@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Manrope:wght@500;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=61">
+  <link rel="stylesheet" href="./styles.css?v=62">
 </head>
 <body>
   <div class="app-shell">
@@ -57,12 +57,14 @@
         <p id="processing-status" class="hint">Capture a etiqueta inteira. A IA vai extrair Nome do Paciente, Cirurgia e Atendimento.</p>
       </section>
 
-      <section class="panel quick-actions-panel">
-        <div class="quick-actions">
+      <div class="quick-actions">
+        <section class="quick-action-card">
           <button id="open-summary-panel" type="button" class="home-action-button">Resumo do dia</button>
+        </section>
+        <section class="quick-action-card">
           <button id="open-monthly-report" type="button" class="home-action-button monthly-action">Relatorio mensal</button>
-        </div>
-      </section>
+        </section>
+      </div>
 
       <section class="panel form-panel modal-panel" id="entry-panel" hidden>
         <div class="section-title">
@@ -267,6 +269,6 @@
       }
     })();
   </script>
-  <script src="./app.js?v=61" type="module"></script>
+  <script src="./app.js?v=62" type="module"></script>
 </body>
 </html>
