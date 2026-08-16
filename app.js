@@ -148,7 +148,7 @@ async function bootstrap() {
 }
 
 function returnToHomePage() {
-  window.location.href = "https://anestesiahmtforms.github.io/?skipNotice=1";
+  window.location.href = "https://anestesiahmtforms.github.io/anestesiahmtformsESCALA.github.io/";
 }
 
 function prepareBackNavigationToHome() {
