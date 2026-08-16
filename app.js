@@ -366,11 +366,10 @@ function renderGoogleSignInButton() {
   googleSigninEl.innerHTML = "";
   googleSigninEl.hidden = false;
   window.google.accounts.id.renderButton(googleSigninEl, {
-    theme: "filled_blue",
+    type: "icon",
+    theme: "outline",
     size: "large",
-    shape: "pill",
-    text: "signin_with",
-    width: Math.min(360, Math.max(260, googleSigninEl.clientWidth || 320)),
+    shape: "circle",
   });
   state.googleButtonRendered = true;
 }
