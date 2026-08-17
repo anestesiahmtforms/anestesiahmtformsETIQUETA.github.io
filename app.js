@@ -922,11 +922,12 @@ function showEntryPanel(options = {}) {
     return;
   }
 
+  movePanelToModalLayer(entryPanelEl);
   entryPanelEl.hidden = false;
   entryPanelEl.classList.add("is-open");
   syncModalLock();
   if (options.scroll !== false) {
-    entryPanelEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    entryPanelEl.scrollTop = 0;
   }
 }
 
@@ -945,6 +946,7 @@ function openSummaryPanel() {
     return;
   }
 
+  movePanelToModalLayer(summaryPanelEl);
   summaryPanelEl.hidden = false;
   summaryPanelEl.classList.add("is-open");
   syncModalLock();
@@ -971,6 +973,7 @@ function openMonthlyReportPanel() {
     return;
   }
 
+  movePanelToModalLayer(monthlyPanelEl);
   monthlyPanelEl.hidden = false;
   monthlyPanelEl.classList.add("is-open");
   monthlyReportButtonEl?.setAttribute("aria-expanded", "true");
@@ -993,6 +996,14 @@ function closeMonthlyReportPanel() {
 function syncModalLock() {
   const hasOpenPanel = [entryPanelEl, summaryPanelEl, monthlyPanelEl].some((panel) => panel && !panel.hidden);
   document.body.classList.toggle("modal-open", hasOpenPanel);
+}
+
+function movePanelToModalLayer(panel) {
+  if (!panel || panel.parentElement === document.body) {
+    return;
+  }
+
+  document.body.appendChild(panel);
 }
 
 function collectFormData() {
