@@ -67,6 +67,7 @@ const monthlyCloseButtonEl = document.querySelector("#close-monthly-report");
 const summaryTotalsEl = document.querySelector("#summary-totals");
 const summaryListEl = document.querySelector("#summary-list");
 const monthlyStatusEl = document.querySelector("#monthly-status");
+const monthlyListEl = document.querySelector("#monthly-list");
 const sendFeedbackEl = document.querySelector("#send-feedback");
 const confirmOverlayEl = document.querySelector("#confirm-overlay");
 const confirmSummaryEl = document.querySelector("#confirm-summary");
@@ -144,7 +145,7 @@ async function bootstrap() {
   const today = getTodayISO();
   fields.data.value = today;
   summaryDateEl.value = today;
-  reportMonthEl.value = today.slice(0, 7);
+  reportMonthEl.value = "";
   scriptUrlEl.value = state.config.scriptUrl;
   setupPlantonistasPicker();
   syncPlantonistasRequirement();
@@ -977,9 +978,11 @@ function openMonthlyReportPanel() {
   monthlyPanelEl.hidden = false;
   monthlyPanelEl.classList.add("is-open");
   monthlyReportButtonEl?.setAttribute("aria-expanded", "true");
-  reportMonthEl.value = reportMonthEl.value || getTodayISO().slice(0, 7);
+  if (!reportMonthEl.value) {
+    renderMonthlyStatus("Escolha um mes para carregar os registros.", "neutral");
+    renderMonthlyList([], "Os registros aparecem somente depois de selecionar um mes.");
+  }
   syncModalLock();
-  loadMonthlySummary({ silent: true });
 }
 
 function closeMonthlyReportPanel() {
@@ -1429,11 +1432,21 @@ function resetSummaryToToday() {
 async function loadMonthlySummary(options = {}) {
   if (!state.config.scriptUrl) {
     state.monthlyRows = [];
+    state.monthlyMonth = "";
     renderMonthlyStatus("Configure a URL do Apps Script para atualizar o relatorio mensal.", "error");
+    renderMonthlyList([], "Configure a integracao para carregar os registros.");
     return;
   }
 
-  const month = reportMonthEl.value || getTodayISO().slice(0, 7);
+  const month = reportMonthEl.value;
+  if (!month) {
+    state.monthlyRows = [];
+    state.monthlyMonth = "";
+    renderMonthlyStatus("Escolha um mes para carregar os registros.", "neutral");
+    renderMonthlyList([], "Os registros aparecem somente depois de selecionar um mes.");
+    return;
+  }
+
   try {
     state.monthlyRows = await loadMonthlyEntries(month);
     state.monthlyMonth = month;
@@ -1443,6 +1456,7 @@ async function loadMonthlySummary(options = {}) {
       `${state.monthlyRows.length} entrada(s) em ${formatMonth(month)}. ${alertCount} alerta(s). Atualizado as ${updatedAt}.`,
       state.monthlyRows.length ? "success" : "neutral"
     );
+    renderMonthlyList(state.monthlyRows, "Nenhum registro encontrado para este mes.");
 
     if (!options.silent) {
       setStatus("Relatorio mensal atualizado.", "success");
@@ -1451,6 +1465,7 @@ async function loadMonthlySummary(options = {}) {
     state.monthlyRows = [];
     state.monthlyMonth = "";
     renderMonthlyStatus(`Nao foi possivel atualizar o relatorio mensal: ${error.message}`, "error");
+    renderMonthlyList([], "Nao foi possivel carregar os registros deste mes.");
     if (!options.silent) {
       setStatus(`Falha ao atualizar relatorio mensal: ${error.message}`, "error");
     }
@@ -1460,6 +1475,48 @@ async function loadMonthlySummary(options = {}) {
 function renderMonthlyStatus(message, tone = "neutral") {
   monthlyStatusEl.textContent = message;
   monthlyStatusEl.dataset.tone = tone;
+}
+
+function renderMonthlyList(rows, emptyMessage = "Nenhum registro encontrado para este mes.") {
+  if (!monthlyListEl) {
+    return;
+  }
+
+  if (!rows.length) {
+    monthlyListEl.innerHTML = `<p class="empty-state">${escapeHtml(emptyMessage)}</p>`;
+    return;
+  }
+
+  monthlyListEl.innerHTML = `
+    <div class="monthly-table-wrap">
+      <table class="monthly-table">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Paciente</th>
+            <th>Cirurgia</th>
+            <th>Atendimento</th>
+            <th>Tipo</th>
+            <th>Credor</th>
+            <th>Plantonista(s)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((row) => `
+            <tr class="${isAlertType(row.tipo) ? "alert-row" : ""}">
+              <td>${escapeHtml(formatDate(row.data || ""))}</td>
+              <td>${escapeHtml(row.nomePaciente || "")}</td>
+              <td>${escapeHtml(row.cirurgia || "")}</td>
+              <td>${escapeHtml(row.atendimento || "")}</td>
+              <td>${escapeHtml(row.tipo || "")}</td>
+              <td>${escapeHtml(row.credor || "")}</td>
+              <td>${escapeHtml(row.plantonistas || "-")}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
 }
 
 function toggleMonthlyReportPanel() {
@@ -1827,7 +1884,13 @@ function generatePdfReport() {
 }
 
 async function generateMonthlyPdfForWhatsApp() {
-  const month = reportMonthEl.value || getTodayISO().slice(0, 7);
+  const month = reportMonthEl.value;
+  if (!month) {
+    renderMonthlyStatus("Escolha um mes antes de gerar o PDF.", "error");
+    setStatus("Escolha um mes antes de gerar o PDF mensal.", "error");
+    return;
+  }
+
   toggleBusy(true);
   setStatus("Gerando relatorio mensal em PDF...", "info");
 
@@ -1839,16 +1902,16 @@ async function generateMonthlyPdfForWhatsApp() {
       state.monthlyMonth = month;
       const alertCount = rows.filter((row) => isAlertType(row.tipo)).length;
       renderMonthlyStatus(`${rows.length} entrada(s) em ${formatMonth(month)}. ${alertCount} alerta(s).`, rows.length ? "success" : "neutral");
+      renderMonthlyList(rows, "Nenhum registro encontrado para este mes.");
       if (!rows.length) {
         setStatus("Nenhuma entrada encontrada para o mes selecionado.", "error");
         return;
       }
-      setStatus("Relatorio mensal carregado. Toque novamente em PDF Mensal no WhatsApp para anexar automaticamente.", "info");
-      return;
     }
 
     const alertCount = rows.filter((row) => isAlertType(row.tipo)).length;
     renderMonthlyStatus(`${rows.length} entrada(s) em ${formatMonth(month)}. ${alertCount} alerta(s).`, rows.length ? "success" : "neutral");
+    renderMonthlyList(rows, "Nenhum registro encontrado para este mes.");
     if (!rows.length) {
       setStatus("Nenhuma entrada encontrada para o mes selecionado.", "error");
       return;
