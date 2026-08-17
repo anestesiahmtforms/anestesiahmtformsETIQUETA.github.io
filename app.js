@@ -142,6 +142,7 @@ bootstrap();
 
 async function bootstrap() {
   prepareBackNavigationToHome();
+  resetInitialPanels();
   const today = getTodayISO();
   fields.data.value = today;
   summaryDateEl.value = today;
@@ -157,6 +158,18 @@ async function bootstrap() {
   }
   await initializeAuthorizedApp();
   registerServiceWorker();
+}
+
+function resetInitialPanels() {
+  [entryPanelEl, summaryPanelEl, monthlyPanelEl].forEach((panel) => {
+    if (!panel) {
+      return;
+    }
+
+    panel.hidden = true;
+    panel.classList.remove("is-open");
+  });
+  document.body.classList.remove("modal-open");
 }
 
 function returnToHomePage() {
