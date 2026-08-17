@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Manrope:wght@500;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=64">
+  <link rel="stylesheet" href="./styles.css?v=65">
 </head>
 <body>
   <div class="app-shell">
@@ -192,8 +192,11 @@
             <span>Selecionar mes</span>
             <input id="report-month" type="month">
           </label>
-          <button id="generate-month-pdf-whatsapp" type="button">PDF mensal no WhatsApp</button>
           <p id="monthly-status" class="monthly-status">Relatorio mensal ainda nao atualizado.</p>
+          <div id="monthly-list" class="monthly-list">
+            <p class="empty-state">Selecione o mes para carregar os registros.</p>
+          </div>
+          <button id="generate-month-pdf-whatsapp" type="button" class="monthly-whatsapp-button">PDF mensal no WhatsApp</button>
         </div>
       </section>
 
@@ -235,15 +238,17 @@
     </div>
   </div>
 
-  <div id="edit-overlay" class="confirm-overlay" hidden>
-    <div class="confirm-card edit-card" role="dialog" aria-modal="true" aria-labelledby="edit-title">
-      <h2 id="edit-title" class="confirm-title-alert">Editar registro</h2>
+  <div id="edit-overlay" class="confirm-overlay edit-overlay" hidden>
+    <div class="confirm-card edit-card modal-panel" role="dialog" aria-modal="true" aria-labelledby="edit-title">
+      <div class="section-title">
+        <h2 id="edit-title">Editar registro</h2>
+        <button id="edit-cancel" type="button" class="modal-close">Fechar</button>
+      </div>
       <p id="edit-context" class="edit-context"></p>
       <div id="edit-summary" class="confirm-summary"></div>
       <p id="edit-feedback" class="send-feedback" hidden></p>
       <div class="confirm-actions">
         <button id="edit-save" type="button">Salvar edicao</button>
-        <button id="edit-cancel" type="button" class="secondary">Cancelar</button>
       </div>
     </div>
   </div>
@@ -269,6 +274,6 @@
       }
     })();
   </script>
-  <script src="./app.js?v=64" type="module"></script>
+  <script src="./app.js?v=65" type="module"></script>
 </body>
 </html>
