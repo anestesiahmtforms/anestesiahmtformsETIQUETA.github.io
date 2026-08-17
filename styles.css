@@ -238,6 +238,13 @@ h2 {
   order: 3;
 }
 
+.summary-panel.modal-panel {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  align-content: start;
+  max-height: calc(100dvh - 20px);
+}
+
 .monthly-panel {
   order: 4;
 }
@@ -1302,6 +1309,28 @@ textarea {
 .summary-list {
   display: grid;
   gap: 8px;
+  max-height: min(58dvh, 520px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 4px 10px;
+  border-radius: 20px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(13, 122, 108, 0.38) rgba(255, 255, 255, 0.48);
+  -webkit-overflow-scrolling: touch;
+}
+
+.summary-list::-webkit-scrollbar {
+  width: 7px;
+}
+
+.summary-list::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.summary-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(13, 122, 108, 0.38);
 }
 
 .summary-bottom-tools {
@@ -1573,6 +1602,30 @@ textarea {
     width: calc(100% - 16px);
     max-height: calc(100dvh - 18px);
     padding: 14px;
+  }
+
+  .summary-panel.modal-panel {
+    max-height: calc(100dvh - 16px);
+    padding: 12px;
+  }
+
+  .summary-panel .section-title {
+    margin-bottom: 9px;
+  }
+
+  .summary-panel .summary-bottom-tools {
+    margin-top: 6px;
+    padding: 10px;
+  }
+
+  .summary-panel .summary-totals {
+    margin: 8px 0 7px;
+  }
+
+  .summary-panel .summary-list {
+    max-height: calc(100dvh - 238px);
+    min-height: 170px;
+    padding: 3px 3px 8px;
   }
 
   .form-panel.modal-panel {
