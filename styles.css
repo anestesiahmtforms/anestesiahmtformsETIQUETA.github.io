@@ -43,6 +43,18 @@ body.modal-open {
   overflow: hidden;
 }
 
+body.modal-open::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 12% 4%, rgba(217, 119, 6, 0.2), transparent 28%),
+    linear-gradient(160deg, rgba(8, 63, 61, 0.72), rgba(15, 23, 42, 0.54));
+  backdrop-filter: blur(12px);
+}
+
 body::before {
   content: "";
   position: fixed;
@@ -284,22 +296,22 @@ h2 {
 }
 
 .form-panel .form-grid {
-  gap: 9px;
+  gap: 7px;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
 }
 
 .form-panel label {
-  gap: 5px;
-  padding: 9px;
-  border-radius: 14px;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 13px;
 }
 
 .form-panel input,
 .form-panel select,
 .form-panel textarea,
 .form-panel .multi-select-toggle {
-  min-height: 42px;
-  padding: 8px 10px;
+  min-height: 38px;
+  padding: 7px 9px;
   border-radius: 11px;
   line-height: 1.2;
 }
@@ -313,11 +325,11 @@ h2 {
 }
 
 .form-panel .section-title {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .form-panel .actions {
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .home-action-button::before {
@@ -367,13 +379,13 @@ h2 {
 }
 
 .modal-panel {
-  position: fixed;
+  position: fixed !important;
   inset:
     max(10px, env(safe-area-inset-top, 0px))
     max(8px, env(safe-area-inset-right, 0px))
     max(10px, env(safe-area-inset-bottom, 0px))
     max(8px, env(safe-area-inset-left, 0px));
-  z-index: 38;
+  z-index: 38 !important;
   width: min(720px, calc(100% - 16px));
   max-height: calc(100dvh - 20px);
   margin: auto;
@@ -382,14 +394,7 @@ h2 {
 }
 
 .modal-panel::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background:
-    radial-gradient(circle at 12% 4%, rgba(217, 119, 6, 0.24), transparent 28%),
-    linear-gradient(160deg, rgba(8, 63, 61, 0.74), rgba(15, 23, 42, 0.5));
-  backdrop-filter: blur(12px);
+  content: none;
 }
 
 .modal-close {
@@ -1472,19 +1477,19 @@ textarea {
   }
 
   .form-panel.modal-panel {
-    width: calc(100% - 10px);
-    max-height: calc(100dvh - 10px);
-    padding: 11px;
+    width: calc(100% - 8px);
+    max-height: calc(100dvh - 8px);
+    padding: 9px;
   }
 
   .form-panel .form-grid {
-    gap: 7px;
+    gap: 6px;
     grid-template-columns: 1fr;
   }
 
   .form-panel label {
-    gap: 4px;
-    padding: 8px;
+    gap: 3px;
+    padding: 7px;
   }
 
   .form-panel label span {
@@ -1495,18 +1500,31 @@ textarea {
   .form-panel select,
   .form-panel textarea,
   .form-panel .multi-select-toggle {
-    min-height: 38px;
-    padding: 7px 9px;
+    min-height: 35px;
+    padding: 6px 8px;
   }
 
   .form-panel .actions {
-    gap: 8px;
-    margin-top: 8px;
+    gap: 7px;
+    margin-top: 7px;
   }
 
   .form-panel .actions button {
-    min-height: 44px;
-    padding: 10px 12px;
+    min-height: 40px;
+    padding: 8px 11px;
+  }
+
+  .form-panel .section-title {
+    margin-bottom: 6px;
+  }
+
+  .form-panel .section-title h2 {
+    font-size: 1.18rem;
+  }
+
+  .form-panel .modal-close {
+    min-height: 30px;
+    padding: 6px 10px;
   }
 
   .quick-actions {
