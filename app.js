@@ -7,7 +7,7 @@ const CONFIG = {
   trustedDeviceDays: 90,
   guideWidthRatio: 0.94,
   guideAspectRatio: 3.35,
-  defaultScriptUrl: "https://script.google.com/macros/s/AKfycbzTb2EQ8iM-oB5KnxI26uBvG_ddjDLCD7G0YBov9mgLe7apX89vBECecaUnOHyRTwED/exec",
+  defaultScriptUrl: "https://script.google.com/macros/s/AKfycbyVIzByslbGnXSj_kCfbiQUZQzV0tznc15OSTCtoC1tO_yvW1PcS88XB6XyCRlpn2fb/exec",
   maxSearchResults: 60,
 };
 
@@ -15,6 +15,7 @@ const LEGACY_SCRIPT_URLS = new Set([
   "https://script.google.com/macros/s/AKfycbxyZIn0JO7eCrCOo5MdaCQkrUMuUwGB0HY_Z6j5FZ8xS5OEJ4ySQLNPaUoIz8nbbrKN/exec",
   "https://script.google.com/macros/s/AKfycbzWwukthNK5OP2itdkJ9tNR-4TZg5IfoORA8q1ke0KpLkCkKklZQJyxEpiEH0mjY0gn0w/exec",
   "https://script.google.com/macros/s/AKfycbxBLda_QQYDfl5Y47kanACt0DSL-BFbhxmOenPL18fHWM6feU0H5xaEagsrwE6rdv546A/exec",
+  "https://script.google.com/macros/s/AKfycbzTb2EQ8iM-oB5KnxI26uBvG_ddjDLCD7G0YBov9mgLe7apX89vBECecaUnOHyRTwED/exec",
 ]);
 
 const ALERT_TYPES = new Set(["particular", "complementacao", "complementação"]);
