@@ -19,6 +19,7 @@ const LEGACY_SCRIPT_URLS = new Set([
 
 const ALERT_TYPES = new Set(["particular", "complementacao", "complementação"]);
 const CREDOR_CAIXA = "Caixa";
+const FINANCIAL_TYPES = new Set(["particular", "complementacao"]);
 
 const state = {
   stream: null,
@@ -85,8 +86,15 @@ const fields = {
   cirurgia: document.querySelector("#cirurgia"),
   atendimento: document.querySelector("#atendimento"),
   tipo: document.querySelector("#tipo"),
+  valor: document.querySelector("#valor"),
+  convenio: document.querySelector("#convenio"),
   credor: document.querySelector("#credor"),
   plantonistas: document.querySelector("#plantonistas"),
+};
+
+const conditionalFields = {
+  valor: document.querySelector("#valor-field"),
+  convenio: document.querySelector("#convenio-field"),
 };
 
 const plantonistasUi = {
@@ -107,6 +115,10 @@ document.querySelector("#generate-month-pdf-whatsapp").addEventListener("click",
 authGoogleButtonEl?.addEventListener("click", authorizeDeviceWithGoogle);
 homeReturnEl?.addEventListener("click", returnToHomePage);
 window.addEventListener("popstate", handleBrowserBack);
+fields.tipo.addEventListener("change", syncConditionalEntryFields);
+fields.valor.addEventListener("blur", () => {
+  fields.valor.value = formatCurrencyInput(fields.valor.value);
+});
 summaryDateEl.addEventListener("change", () => {
   if (summarySearchEl) {
     summarySearchEl.value = "";
@@ -149,6 +161,7 @@ async function bootstrap() {
   reportMonthEl.value = "";
   scriptUrlEl.value = state.config.scriptUrl;
   setupPlantonistasPicker();
+  syncConditionalEntryFields();
   syncPlantonistasRequirement();
   renderSheetStatus();
   const authorized = await authenticateUser();
@@ -1030,6 +1043,8 @@ function collectFormData() {
     cirurgia: fields.cirurgia.value.trim(),
     atendimento: fields.atendimento.value.trim(),
     tipo: fields.tipo.value.trim(),
+    valor: shouldRequireValor(fields.tipo.value) ? formatCurrencyInput(fields.valor.value) : "",
+    convenio: shouldRequireConvenio(fields.tipo.value) ? fields.convenio.value.trim() : "",
     credor: fields.credor.value.trim(),
     plantonistas: isCaixa ? "" : getSelectedPlantonistasValue(),
     observacoes: "",
@@ -1123,6 +1138,8 @@ function findExactDuplicates(payload) {
     cleanDigits(row.cirurgia) === cleanDigits(payload.cirurgia) &&
     cleanDigits(row.atendimento) === cleanDigits(payload.atendimento) &&
     normalizeCompare(row.tipo) === normalizeCompare(payload.tipo) &&
+    normalizeCompare(row.valor || "") === normalizeCompare(payload.valor || "") &&
+    normalizeCompare(row.convenio || "") === normalizeCompare(payload.convenio || "") &&
     normalizeCompare(row.credor) === normalizeCompare(payload.credor) &&
     normalizeCompare(row.plantonistas || "") === normalizeCompare(payload.plantonistas || "")
   );
@@ -1256,6 +1273,14 @@ function confirmSubmissionEditable(payload, duplicateRows = []) {
             ${renderOption("Outros", "Outros", currentPayload.tipo)}
           </select>
         </label>
+        <label id="confirm-valor-field" ${shouldRequireValor(currentPayload.tipo) ? "" : "hidden"}>
+          <span>Valor em Real</span>
+          <input id="confirm-valor" inputmode="decimal" value="${escapeHtml(currentPayload.valor || "")}" placeholder="R$ 0,00">
+        </label>
+        <label id="confirm-convenio-field" ${shouldRequireConvenio(currentPayload.tipo) ? "" : "hidden"}>
+          <span>Convênio</span>
+          <input id="confirm-convenio" type="text" value="${escapeHtml(currentPayload.convenio || "")}" placeholder="Nome do convênio">
+        </label>
         <label>
           <span>Credor</span>
           <select id="confirm-credor" required>
@@ -1277,6 +1302,7 @@ function confirmSubmissionEditable(payload, duplicateRows = []) {
 
   renderConfirmationFields();
   confirmOverlayEl.hidden = false;
+  bindConfirmConditionalFields();
   confirmSendEl.focus();
 
   return new Promise((resolve) => {
@@ -1293,6 +1319,7 @@ function confirmSubmissionEditable(payload, duplicateRows = []) {
       const missing = getMissingRequiredFields(currentPayload);
       if (missing.length) {
         renderConfirmationFields("Corrija os campos obrigatórios antes de confirmar o envio.");
+        bindConfirmConditionalFields();
         return;
       }
 
@@ -1301,6 +1328,7 @@ function confirmSubmissionEditable(payload, duplicateRows = []) {
       const duplicateJustification = currentPayload.duplicateJustification || "";
       if (currentDuplicateRows.length && !duplicateJustification) {
         renderConfirmationFields("Informe a justificativa para enviar este lançamento duplicado.");
+        bindConfirmConditionalFields();
         confirmSummaryEl.querySelector("#duplicate-justification")?.focus();
         return;
       }
@@ -1324,6 +1352,20 @@ function confirmSubmissionEditable(payload, duplicateRows = []) {
   });
 }
 
+function bindConfirmConditionalFields() {
+  const typeEl = confirmSummaryEl?.querySelector("#confirm-tipo");
+  const valueEl = confirmSummaryEl?.querySelector("#confirm-valor");
+  if (typeEl) {
+    typeEl.addEventListener("change", () => syncInlineConditionalFields(confirmSummaryEl, "confirm"));
+    syncInlineConditionalFields(confirmSummaryEl, "confirm");
+  }
+  if (valueEl) {
+    valueEl.addEventListener("blur", () => {
+      valueEl.value = formatCurrencyInput(valueEl.value);
+    });
+  }
+}
+
 function renderOption(value, label, selectedValue) {
   const selected = String(value) === String(selectedValue || "") ? " selected" : "";
   return `<option value="${escapeHtml(value)}"${selected}>${escapeHtml(label)}</option>`;
@@ -1340,6 +1382,12 @@ function collectConfirmationPayload(basePayload) {
     cirurgia: cleanDigits(confirmSummaryEl.querySelector("#confirm-cirurgia")?.value || ""),
     atendimento: cleanDigits(confirmSummaryEl.querySelector("#confirm-atendimento")?.value || ""),
     tipo: confirmSummaryEl.querySelector("#confirm-tipo")?.value.trim() || "",
+    valor: shouldRequireValor(confirmSummaryEl.querySelector("#confirm-tipo")?.value || "")
+      ? formatCurrencyInput(confirmSummaryEl.querySelector("#confirm-valor")?.value || "")
+      : "",
+    convenio: shouldRequireConvenio(confirmSummaryEl.querySelector("#confirm-tipo")?.value || "")
+      ? (confirmSummaryEl.querySelector("#confirm-convenio")?.value.trim() || "")
+      : "",
     credor,
     plantonistas: credor === CREDOR_CAIXA ? "" : (confirmSummaryEl.querySelector("#confirm-plantonistas")?.value.trim() || ""),
     duplicateJustification,
@@ -1348,11 +1396,73 @@ function collectConfirmationPayload(basePayload) {
 
 function getMissingRequiredFields(payload) {
   const required = ["data", "nomePaciente", "cirurgia", "atendimento", "tipo", "credor"];
+  if (shouldRequireValor(payload.tipo)) {
+    required.push("valor");
+  }
+  if (shouldRequireConvenio(payload.tipo)) {
+    required.push("convenio");
+  }
   if (payload.credor !== CREDOR_CAIXA) {
     required.push("plantonistas");
   }
 
   return required.filter((key) => !String(payload[key] || "").trim());
+}
+
+function syncConditionalEntryFields() {
+  const tipo = fields.tipo.value;
+  const needsValor = shouldRequireValor(tipo);
+  const needsConvenio = shouldRequireConvenio(tipo);
+
+  if (conditionalFields.valor) {
+    conditionalFields.valor.hidden = !needsValor;
+  }
+  if (fields.valor) {
+    fields.valor.required = needsValor;
+    if (!needsValor) {
+      fields.valor.value = "";
+    }
+  }
+
+  if (conditionalFields.convenio) {
+    conditionalFields.convenio.hidden = !needsConvenio;
+  }
+  if (fields.convenio) {
+    fields.convenio.required = needsConvenio;
+    if (!needsConvenio) {
+      fields.convenio.value = "";
+    }
+  }
+}
+
+function syncInlineConditionalFields(root, prefix) {
+  const typeEl = root?.querySelector(`#${prefix}-tipo`);
+  const valueFieldEl = root?.querySelector(`#${prefix}-valor-field`);
+  const valueEl = root?.querySelector(`#${prefix}-valor`);
+  const convenioFieldEl = root?.querySelector(`#${prefix}-convenio-field`);
+  const convenioEl = root?.querySelector(`#${prefix}-convenio`);
+  const needsValor = shouldRequireValor(typeEl?.value || "");
+  const needsConvenio = shouldRequireConvenio(typeEl?.value || "");
+
+  if (valueFieldEl) {
+    valueFieldEl.hidden = !needsValor;
+  }
+  if (valueEl) {
+    valueEl.required = needsValor;
+    if (!needsValor) {
+      valueEl.value = "";
+    }
+  }
+
+  if (convenioFieldEl) {
+    convenioFieldEl.hidden = !needsConvenio;
+  }
+  if (convenioEl) {
+    convenioEl.required = needsConvenio;
+    if (!needsConvenio) {
+      convenioEl.value = "";
+    }
+  }
 }
 
 function applyConfirmationPayloadToForm(payload) {
@@ -1361,7 +1471,10 @@ function applyConfirmationPayloadToForm(payload) {
   fields.cirurgia.value = payload.cirurgia || "";
   fields.atendimento.value = payload.atendimento || "";
   fields.tipo.value = payload.tipo || "";
+  fields.valor.value = payload.valor || "";
+  fields.convenio.value = payload.convenio || "";
   fields.credor.value = payload.credor || "";
+  syncConditionalEntryFields();
   setSelectedPlantonistasFromValue(payload.plantonistas || "");
   syncPlantonistasRequirement();
 }
@@ -1510,6 +1623,8 @@ function renderMonthlyList(rows, emptyMessage = "Nenhum registro encontrado para
             <th>Cirurgia</th>
             <th>Atendimento</th>
             <th>Tipo</th>
+            <th>Valor</th>
+            <th>Convênio</th>
             <th>Credor</th>
             <th>Plantonista(s)</th>
           </tr>
@@ -1522,6 +1637,8 @@ function renderMonthlyList(rows, emptyMessage = "Nenhum registro encontrado para
               <td>${escapeHtml(row.cirurgia || "")}</td>
               <td>${escapeHtml(row.atendimento || "")}</td>
               <td>${escapeHtml(row.tipo || "")}</td>
+              <td>${escapeHtml(row.valor || "-")}</td>
+              <td>${escapeHtml(row.convenio || "-")}</td>
               <td>${escapeHtml(row.credor || "")}</td>
               <td>${escapeHtml(row.plantonistas || "-")}</td>
             </tr>
@@ -1562,7 +1679,7 @@ function renderSummary(rows, emptyMessage = "Nenhuma entrada encontrada nesta da
         <div class="summary-index">${index + 1}</div>
         <div class="summary-main">
           <strong>${escapeHtml(row.nomePaciente || "")}</strong>
-          <span>Data ${escapeHtml(formatDate(row.data || ""))} | Cirurgia ${escapeHtml(row.cirurgia || "")} | Atendimento ${escapeHtml(row.atendimento || "")}</span>
+          <span>Data ${escapeHtml(formatDate(row.data || ""))} | Cirurgia ${escapeHtml(row.cirurgia || "")} | Atendimento ${escapeHtml(row.atendimento || "")}${row.valor ? ` | Valor ${escapeHtml(row.valor)}` : ""}${row.convenio ? ` | Convênio ${escapeHtml(row.convenio)}` : ""}</span>
           <small>Responsavel: ${escapeHtml(row.criadoPor || "Nao informado")}</small>
         </div>
         <div class="summary-type">
@@ -1708,6 +1825,14 @@ function renderEditRecordFields() {
           ${renderOption("Outros", "Outros", row.tipo)}
         </select>
       </label>
+      <label id="edit-valor-field" ${shouldRequireValor(row.tipo) ? "" : "hidden"}>
+        <span>Valor em Real</span>
+        <input id="edit-valor" inputmode="decimal" value="${escapeHtml(row.valor || "")}" placeholder="R$ 0,00">
+      </label>
+      <label id="edit-convenio-field" ${shouldRequireConvenio(row.tipo) ? "" : "hidden"}>
+        <span>Convênio</span>
+        <input id="edit-convenio" type="text" value="${escapeHtml(row.convenio || "")}" placeholder="Nome do convênio">
+      </label>
       <label>
         <span>Credor</span>
         <select id="edit-credor" required>
@@ -1727,21 +1852,39 @@ function renderEditRecordFields() {
       </label>
     </div>
   `;
+  bindEditConditionalFields();
 }
 
 function collectEditPayload() {
   const credor = editSummaryEl.querySelector("#edit-credor")?.value.trim() || "";
+  const tipo = editSummaryEl.querySelector("#edit-tipo")?.value.trim() || "";
   return {
     rowNumber: state.editingRow?.rowNumber || "",
     data: editSummaryEl.querySelector("#edit-data")?.value || "",
     nomePaciente: editSummaryEl.querySelector("#edit-nomePaciente")?.value.trim() || "",
     cirurgia: cleanDigits(editSummaryEl.querySelector("#edit-cirurgia")?.value || ""),
     atendimento: cleanDigits(editSummaryEl.querySelector("#edit-atendimento")?.value || ""),
-    tipo: editSummaryEl.querySelector("#edit-tipo")?.value.trim() || "",
+    tipo,
+    valor: shouldRequireValor(tipo) ? formatCurrencyInput(editSummaryEl.querySelector("#edit-valor")?.value || "") : "",
+    convenio: shouldRequireConvenio(tipo) ? (editSummaryEl.querySelector("#edit-convenio")?.value.trim() || "") : "",
     credor,
     plantonistas: credor === CREDOR_CAIXA ? "" : (editSummaryEl.querySelector("#edit-plantonistas")?.value.trim() || ""),
     observacoes: editSummaryEl.querySelector("#edit-observacoes")?.value.trim() || "",
   };
+}
+
+function bindEditConditionalFields() {
+  const typeEl = editSummaryEl?.querySelector("#edit-tipo");
+  const valueEl = editSummaryEl?.querySelector("#edit-valor");
+  if (typeEl) {
+    typeEl.addEventListener("change", () => syncInlineConditionalFields(editSummaryEl, "edit"));
+    syncInlineConditionalFields(editSummaryEl, "edit");
+  }
+  if (valueEl) {
+    valueEl.addEventListener("blur", () => {
+      valueEl.value = formatCurrencyInput(valueEl.value);
+    });
+  }
 }
 
 async function saveEditedRecord() {
@@ -1845,6 +1988,8 @@ function generatePdfReport() {
     row.cirurgia || "",
     row.atendimento || "",
     row.tipo || "",
+    row.valor || "-",
+    row.convenio || "-",
     row.credor || "",
     row.plantonistas || "",
     row.observacoes || "",
@@ -1860,20 +2005,22 @@ function generatePdfReport() {
 
   doc.autoTable({
     startY: 32,
-    head: [["#", "Nome do Paciente", "Cirurgia", "Atendimento", "Tipo", "Credor", "Plantonista(s)", "Observacoes"]],
+    head: [["#", "Nome do Paciente", "Cirurgia", "Atendimento", "Tipo", "Valor", "Convênio", "Credor", "Plantonista(s)", "Observacoes"]],
     body: rows,
     theme: "grid",
     styles: { fontSize: 8, cellPadding: 2.2, overflow: "linebreak" },
     headStyles: { fillColor: [11, 63, 58], textColor: [255, 255, 255] },
     columnStyles: {
-      0: { cellWidth: 10 },
-      1: { cellWidth: 58 },
-      2: { cellWidth: 22 },
-      3: { cellWidth: 26 },
-      4: { cellWidth: 28 },
-      5: { cellWidth: 40 },
-      6: { cellWidth: 30 },
-      7: { cellWidth: 62 },
+      0: { cellWidth: 8 },
+      1: { cellWidth: 46 },
+      2: { cellWidth: 18 },
+      3: { cellWidth: 22 },
+      4: { cellWidth: 22 },
+      5: { cellWidth: 18 },
+      6: { cellWidth: 24 },
+      7: { cellWidth: 30 },
+      8: { cellWidth: 25 },
+      9: { cellWidth: 48 },
     },
     didParseCell(data) {
       if (data.section === "body") {
@@ -1977,6 +2124,8 @@ function buildMonthlyPdf(rows, month) {
     row.cirurgia || "",
     row.atendimento || "",
     row.tipo || "",
+    row.valor || "-",
+    row.convenio || "-",
     row.credor || "",
     row.plantonistas || "-",
     row.criadoPor || "",
@@ -1995,24 +2144,26 @@ function buildMonthlyPdf(rows, month) {
 
   doc.autoTable({
     startY: 34,
-    head: [["#", "Data", "Nome do Paciente", "Cirurgia", "Atendimento", "Tipo", "Credor", "Plantonista(s)", "Responsavel", "Editado por", "Alteracoes", "Observacoes"]],
+    head: [["#", "Data", "Nome do Paciente", "Cirurgia", "Atendimento", "Tipo", "Valor", "Convênio", "Credor", "Plantonista(s)", "Responsavel", "Editado por", "Alteracoes", "Observacoes"]],
     body: tableRows,
     theme: "grid",
     styles: { fontSize: 7.6, cellPadding: 2, overflow: "linebreak", valign: "middle" },
     headStyles: { fillColor: [11, 63, 58], textColor: [255, 255, 255], fontStyle: "bold" },
     columnStyles: {
       0: { cellWidth: 7 },
-      1: { cellWidth: 17 },
-      2: { cellWidth: 38 },
-      3: { cellWidth: 17 },
-      4: { cellWidth: 21 },
-      5: { cellWidth: 19 },
-      6: { cellWidth: 24 },
-      7: { cellWidth: 22 },
-      8: { cellWidth: 28 },
-      9: { cellWidth: 28 },
-      10: { cellWidth: 35 },
-      11: { cellWidth: 25 },
+      1: { cellWidth: 15 },
+      2: { cellWidth: 34 },
+      3: { cellWidth: 16 },
+      4: { cellWidth: 18 },
+      5: { cellWidth: 16 },
+      6: { cellWidth: 15 },
+      7: { cellWidth: 20 },
+      8: { cellWidth: 18 },
+      9: { cellWidth: 18 },
+      10: { cellWidth: 24 },
+      11: { cellWidth: 22 },
+      12: { cellWidth: 28 },
+      13: { cellWidth: 18 },
     },
     didParseCell(data) {
       if (data.section === "body") {
@@ -2024,7 +2175,7 @@ function buildMonthlyPdf(rows, month) {
         } else if (row?.resumoEdicao) {
           data.cell.styles.fillColor = [240, 253, 244];
         }
-        if (data.column.index === 10 && row?.resumoEdicao) {
+        if (data.column.index === 12 && row?.resumoEdicao) {
           data.cell.styles.textColor = [29, 78, 216];
           data.cell.styles.fontStyle = "bold";
         }
@@ -2119,6 +2270,40 @@ function isAlertType(value) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
   return normalized === "particular" || normalized === "complementacao";
+}
+
+function shouldRequireValor(value) {
+  const normalized = normalizeCompare(value);
+  return FINANCIAL_TYPES.has(normalized);
+}
+
+function shouldRequireConvenio(value) {
+  return normalizeCompare(value) === "complementacao";
+}
+
+function formatCurrencyInput(value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return "";
+  }
+
+  const numeric = Number(
+    text
+      .replace(/[^\d,.-]/g, "")
+      .replace(/\.(?=\d{3}(?:\D|$))/g, "")
+      .replace(",", ".")
+  );
+
+  if (!Number.isFinite(numeric)) {
+    return text;
+  }
+
+  return numeric.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 function syncPlantonistasRequirement() {

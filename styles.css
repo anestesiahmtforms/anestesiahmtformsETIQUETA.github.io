@@ -228,6 +228,10 @@ h2 {
   display: none !important;
 }
 
+label[hidden] {
+  display: none !important;
+}
+
 .form-panel.is-open,
 .summary-panel.is-open,
 .monthly-panel.is-open,
@@ -1219,7 +1223,7 @@ textarea {
 
 .monthly-table {
   width: 100%;
-  min-width: 760px;
+  min-width: 920px;
   border-collapse: collapse;
   font-size: 0.78rem;
 }

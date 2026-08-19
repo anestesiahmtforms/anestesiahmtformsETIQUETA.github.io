@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Manrope:wght@500;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=70">
+  <link rel="stylesheet" href="./styles.css?v=71">
 </head>
 <body>
   <div class="app-shell">
@@ -102,6 +102,16 @@
               <option>Unimed</option>
               <option>Outros</option>
             </select>
+          </label>
+
+          <label id="valor-field" hidden>
+            <span>Valor em Real</span>
+            <input id="valor" name="valor" type="text" inputmode="decimal" autocomplete="off" placeholder="R$ 0,00">
+          </label>
+
+          <label id="convenio-field" hidden>
+            <span>Convênio</span>
+            <input id="convenio" name="convenio" type="text" autocomplete="off" placeholder="Nome do convênio">
           </label>
 
           <label>
@@ -274,6 +284,6 @@
       }
     })();
   </script>
-  <script src="./app.js?v=70" type="module"></script>
+  <script src="./app.js?v=71" type="module"></script>
 </body>
 </html>

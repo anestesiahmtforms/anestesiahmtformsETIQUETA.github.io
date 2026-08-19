@@ -82,6 +82,8 @@ const REGISTROS_HEADERS = [
   "Editado em",
   "Editado por",
   "Resumo da edicao",
+  "Valor",
+  "Convênio",
 ];
 
 const TIPO_OPTIONS = ["Particular", "Complementação", "Unimed", "Outros"];
@@ -215,6 +217,11 @@ function doPost(e) {
       user.email,
       "",
       "",
+      "",
+      "",
+      "",
+      payload.valor || "",
+      payload.convenio || "",
     ]);
     const appendedRow = sheet.getLastRow();
     setCompactCellWithNote_(
@@ -607,6 +614,12 @@ function applyRowFormats_(sheet, rowNumber) {
 
 function validatePayload_(payload) {
   const required = ["data", "nomePaciente", "cirurgia", "atendimento", "tipo", "credor"];
+  if (isFinancialType_(payload.tipo)) {
+    required.push("valor");
+  }
+  if (isComplementacaoType_(payload.tipo)) {
+    required.push("convenio");
+  }
   if (payload.credor !== "Caixa") {
     required.push("plantonistas");
   }
@@ -676,6 +689,8 @@ function handleUpdateRecord_(payload, user) {
   const observationChanged = normalizeCompare_(oldEntry.observacoes || "") !== normalizeCompare_(payload.observacoes || "");
 
   sheet.getRange(rowNumber, 1, 1, 8).setValues([updatedValues]);
+  sheet.getRange(rowNumber, REGISTROS_HEADERS.indexOf("Valor") + 1).setValue(isFinancialType_(payload.tipo) ? (payload.valor || "") : "");
+  sheet.getRange(rowNumber, REGISTROS_HEADERS.indexOf("Convênio") + 1).setValue(isComplementacaoType_(payload.tipo) ? (payload.convenio || "") : "");
   setCompactCellWithNote_(
     sheet.getRange(rowNumber, REGISTROS_HEADERS.indexOf("Observacoes") + 1),
     String(payload.observacoes || "").trim(),
@@ -721,6 +736,8 @@ function buildEditSummary_(oldEntry, payload) {
     { key: "cirurgia", label: "Cirurgia", oldValue: oldEntry.cirurgia, newValue: payload.cirurgia },
     { key: "atendimento", label: "Atendimento", oldValue: oldEntry.atendimento, newValue: payload.atendimento },
     { key: "tipo", label: "Tipo", oldValue: oldEntry.tipo, newValue: payload.tipo },
+    { key: "valor", label: "Valor", oldValue: oldEntry.valor, newValue: isFinancialType_(payload.tipo) ? payload.valor : "" },
+    { key: "convenio", label: "Convênio", oldValue: oldEntry.convenio, newValue: isComplementacaoType_(payload.tipo) ? payload.convenio : "" },
     { key: "credor", label: "Credor", oldValue: oldEntry.credor, newValue: payload.credor },
     { key: "plantonistas", label: "Plantonista(s)", oldValue: oldEntry.plantonistas, newValue: payload.credor === "Caixa" ? "" : payload.plantonistas },
   ];
@@ -768,6 +785,8 @@ function findExactDuplicates_(payload) {
       cleanDigits_(entry.cirurgia) === cleanDigits_(payload.cirurgia) &&
       cleanDigits_(entry.atendimento) === cleanDigits_(payload.atendimento) &&
       normalizeCompare_(entry.tipo) === normalizeCompare_(payload.tipo) &&
+      normalizeCompare_(entry.valor || "") === normalizeCompare_(payload.valor || "") &&
+      normalizeCompare_(entry.convenio || "") === normalizeCompare_(payload.convenio || "") &&
       normalizeCompare_(entry.credor) === normalizeCompare_(payload.credor) &&
       normalizeCompare_(entry.plantonistas || "") === normalizeCompare_(payload.plantonistas || "");
   });
@@ -798,6 +817,8 @@ function searchEntries_(query, limit) {
         entry.cirurgia,
         entry.atendimento,
         entry.tipo,
+        entry.valor,
+        entry.convenio,
         entry.credor,
         entry.plantonistas,
         entry.observacoes,
@@ -848,6 +869,8 @@ function rowToEntry_(row, rowNumber, notes) {
     editadoEm: row[12],
     editadoPor: row[13],
     resumoEdicao: notes[14] || row[14],
+    valor: row[15],
+    convenio: row[16],
   };
 }
 
@@ -910,6 +933,15 @@ function normalizeCompare_(value) {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function isFinancialType_(value) {
+  const normalized = normalizeCompare_(value);
+  return normalized === "particular" || normalized === "complementacao";
+}
+
+function isComplementacaoType_(value) {
+  return normalizeCompare_(value) === "complementacao";
 }
 
 function cleanDigits_(value) {
