@@ -119,6 +119,11 @@ window.addEventListener("popstate", handleBrowserBack);
 fields.tipo.addEventListener("change", syncConditionalEntryFields);
 fields.valor.addEventListener("blur", () => {
   fields.valor.value = formatCurrencyInput(fields.valor.value);
+  updateEntryValidationStates();
+});
+Object.values(fields).forEach((field) => {
+  field?.addEventListener("input", updateEntryValidationStates);
+  field?.addEventListener("change", updateEntryValidationStates);
 });
 summaryDateEl.addEventListener("change", () => {
   if (summarySearchEl) {
@@ -139,7 +144,10 @@ summaryTodayButtonEl?.addEventListener("click", resetSummaryToToday);
 monthlyReportButtonEl?.addEventListener("click", toggleMonthlyReportPanel);
 monthlyCloseButtonEl?.addEventListener("click", closeMonthlyReportPanel);
 reportMonthEl.addEventListener("change", loadMonthlySummary);
-fields.credor.addEventListener("change", syncPlantonistasRequirement);
+fields.credor.addEventListener("change", () => {
+  syncPlantonistasRequirement();
+  updateEntryValidationStates();
+});
 editSaveEl?.addEventListener("click", saveEditedRecord);
 editCancelEl?.addEventListener("click", closeEditRecord);
 document.addEventListener("click", closePlantonistasPickerOnOutsideClick);
@@ -943,6 +951,8 @@ function applyDataToForm(data) {
   if (data.atendimento) {
     fields.atendimento.value = data.atendimento;
   }
+
+  updateEntryValidationStates();
 }
 
 function showEntryPanel(options = {}) {
@@ -953,6 +963,9 @@ function showEntryPanel(options = {}) {
   movePanelToModalLayer(entryPanelEl);
   entryPanelEl.hidden = false;
   entryPanelEl.classList.add("is-open");
+  syncConditionalEntryFields();
+  syncPlantonistasRequirement();
+  updateEntryValidationStates();
   syncModalLock();
   if (options.scroll !== false) {
     entryPanelEl.scrollTop = 0;
@@ -1063,6 +1076,13 @@ async function sendToSheet() {
   }
 
   let payload = collectFormData();
+  const missingFields = getMissingRequiredFields(payload);
+  if (missingFields.length) {
+    updateEntryValidationStates({ showMissing: true });
+    showSendError(`Preencha os campos obrigatórios: ${missingFields.map(getEntryFieldLabel).join(", ")}.`);
+    return;
+  }
+
   await loadSummary({ silent: true, date: payload.data || getTodayISO() });
   const duplicateRows = findExactDuplicates(payload);
   const confirmation = await confirmSubmissionEditable(payload, duplicateRows);
@@ -1410,6 +1430,70 @@ function getMissingRequiredFields(payload) {
   return required.filter((key) => !String(payload[key] || "").trim());
 }
 
+function getEntryFieldLabel(key) {
+  const labels = {
+    data: "Data",
+    nomePaciente: "Nome do Paciente",
+    cirurgia: "Cirurgia",
+    atendimento: "Atendimento",
+    tipo: "Tipo",
+    valor: "Valor em Real",
+    convenio: "Convênio",
+    credor: "Credor",
+    plantonistas: "Plantonista(s)",
+  };
+
+  return labels[key] || key;
+}
+
+function getEntryValidationControl(key) {
+  if (key === "plantonistas") {
+    return plantonistasUi.button || fields.plantonistas;
+  }
+
+  return fields[key];
+}
+
+function updateEntryValidationStates(options = {}) {
+  const payload = collectFormData();
+  const requiredKeys = ["data", "nomePaciente", "cirurgia", "atendimento", "tipo", "credor"];
+  if (shouldRequireValor(payload.tipo)) {
+    requiredKeys.push("valor");
+  }
+  if (shouldRequireConvenio(payload.tipo)) {
+    requiredKeys.push("convenio");
+  }
+  if (payload.credor !== CREDOR_CAIXA) {
+    requiredKeys.push("plantonistas");
+  }
+
+  Object.keys(fields).forEach((key) => {
+    const control = getEntryValidationControl(key);
+    const label = fields[key]?.closest("label");
+    const isRequired = requiredKeys.includes(key);
+    const isFilled = String(payload[key] || "").trim().length > 0;
+    const emptyRequired = isRequired && !isFilled;
+    const filledRequired = isRequired && isFilled;
+
+    label?.classList.toggle("is-required-empty", emptyRequired);
+    label?.classList.toggle("is-required-filled", filledRequired);
+    control?.classList.toggle("is-required-empty", emptyRequired);
+    control?.classList.toggle("is-required-filled", filledRequired);
+    control?.setAttribute("aria-invalid", String(emptyRequired));
+
+    if (!isRequired) {
+      control?.removeAttribute("aria-invalid");
+    }
+  });
+
+  if (options.showMissing) {
+    const firstMissingKey = requiredKeys.find((key) => !String(payload[key] || "").trim());
+    const firstControl = getEntryValidationControl(firstMissingKey);
+    firstControl?.focus?.({ preventScroll: true });
+    firstControl?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+  }
+}
+
 function syncConditionalEntryFields() {
   const tipo = fields.tipo.value;
   const needsValor = shouldRequireValor(tipo);
@@ -1434,6 +1518,8 @@ function syncConditionalEntryFields() {
       fields.convenio.value = "";
     }
   }
+
+  updateEntryValidationStates();
 }
 
 function syncInlineConditionalFields(root, prefix) {
@@ -1478,6 +1564,7 @@ function applyConfirmationPayloadToForm(payload) {
   syncConditionalEntryFields();
   setSelectedPlantonistasFromValue(payload.plantonistas || "");
   syncPlantonistasRequirement();
+  updateEntryValidationStates();
 }
 
 async function refreshDisplayedSummaries() {
@@ -2221,6 +2308,8 @@ function resetForm(options = {}) {
   fields.data.value = options.keepDate ? selectedDate : getTodayISO();
   clearPlantonistasSelection();
   syncPlantonistasRequirement();
+  syncConditionalEntryFields();
+  updateEntryValidationStates();
   setSendFeedback("", "neutral");
 
   if (!options.keepImage) {
@@ -2396,6 +2485,8 @@ function syncPlantonistasFromCheckboxes() {
     plantonistasUi.button.textContent = selected.length ? selected.join(", ") : "";
     plantonistasUi.button.classList.toggle("has-selection", selected.length > 0);
   }
+
+  updateEntryValidationStates();
 }
 
 function getSelectedPlantonistasValue() {
